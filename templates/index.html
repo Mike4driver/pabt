@@ -36,6 +36,19 @@
             <div class="flex justify-between items-center h-16">
                 <h1 class="text-2xl font-semibold text-white">Media Browser</h1>
                 <div class="flex items-center space-x-6">
+                    <div class="flex items-center space-x-2">
+                        <label for="grid-size-selector" class="text-xs text-slate-400 whitespace-nowrap">Grid Size:</label>
+                        <select id="grid-size-selector" 
+                                name="grid_size"
+                                class="text-xs bg-slate-700 border border-slate-600 text-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
+                                hx-post="/settings/grid-size"
+                                hx-trigger="change"
+                                hx-on::after-request="window.location.reload()">
+                            <option value="small" {% if grid_size == 'small' %}selected{% endif %}>Small</option>
+                            <option value="medium" {% if grid_size == 'medium' %}selected{% endif %}>Medium</option>
+                            <option value="large" {% if grid_size == 'large' %}selected{% endif %}>Large</option>
+                        </select>
+                    </div>
                     <a href="{{ url_for('thumbnail_tools_page') }}" 
                        class="text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 whitespace-nowrap">
                         Media Processing Tools
@@ -64,7 +77,7 @@
     </header>
     <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div id="media-grid" 
-             class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 lg:gap-6"
+             class="grid {% if grid_size == 'small' %}grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 lg:gap-4{% elif grid_size == 'large' %}grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8{% else %}grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 lg:gap-6{% endif %}"
              hx-get="/files" 
              hx-trigger="load, every 60s"
              hx-swap="innerHTML"

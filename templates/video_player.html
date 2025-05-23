@@ -57,23 +57,151 @@
                     </div>
                 </div>
 
-                <!-- Video Player Container -->
-                <div class="aspect-video bg-black rounded-lg overflow-hidden shadow-2xl">
+                <!-- Custom Video Player Container -->
+                <div class="aspect-video bg-black rounded-lg overflow-hidden shadow-2xl relative group">
                     <video id="main-video-player" 
                            class="w-full h-full" 
-                           controls 
-                           autoplay 
                            poster="{{ video.thumbnail }}"
-                           preload="metadata">
+                           preload="metadata"
+                           onclick="togglePlay()">
                         <source src="{{ video.path }}" type="video/mp4">
                         Your browser does not support the video tag.
                     </video>
+                    
+                    <!-- Custom Video Controls -->
+                    <div id="video-controls" class="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 via-black/60 to-transparent p-4 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                        <!-- Timeline Container -->
+                        <div class="mb-3">
+                            <div class="flex items-center text-white text-sm mb-2">
+                                <span id="current-time">0:00</span>
+                                <span class="mx-2">/</span>
+                                <span id="duration">0:00</span>
+                            </div>
+                            <!-- Timeline -->
+                            <div class="relative h-2 bg-white/20 rounded-full cursor-pointer" id="timeline-container">
+                                <div id="timeline-progress" class="absolute top-0 left-0 h-full bg-primary rounded-full pointer-events-none" style="width: 0%"></div>
+                                <div id="timeline-handle" class="absolute top-1/2 -translate-y-1/2 w-4 h-4 bg-white rounded-full shadow-lg opacity-0 transition-opacity duration-200 pointer-events-none" style="left: 0%"></div>
+                            </div>
+                        </div>
+                        
+                        <!-- Control Buttons -->
+                        <div class="flex items-center justify-between">
+                            <div class="flex items-center space-x-3">
+                                <!-- Play/Pause Button -->
+                                <button id="play-pause-btn" onclick="togglePlay()" class="text-white hover:text-primary transition-colors duration-150">
+                                    <svg id="play-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                                        <path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" />
+                                    </svg>
+                                    <svg id="pause-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 hidden">
+                                        <path fill-rule="evenodd" d="M6.75 5.25a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75H7.5a.75.75 0 01-.75-.75V5.25zm7.5 0A.75.75 0 0114.25 4.5h1.5a.75.75 0 01.75.75v13.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75V5.25z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                
+                                <!-- Volume Controls -->
+                                <div class="flex items-center space-x-2">
+                                    <button id="mute-btn" onclick="toggleMute()" class="text-white hover:text-primary transition-colors duration-150">
+                                        <svg id="volume-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                                            <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06zM17.78 9.22a.75.75 0 10-1.06 1.06L18.44 12l-1.72 1.72a.75.75 0 001.06 1.06L19.5 13.06l1.72 1.72a.75.75 0 101.06-1.06L20.56 12l1.72-1.72a.75.75 0 00-1.06-1.06L19.5 10.94l-1.72-1.72z" />
+                                        </svg>
+                                        <svg id="mute-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 hidden">
+                                            <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 001.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06zM17.78 9.22a.75.75 0 10-1.06 1.06L18.44 12l-1.72 1.72a.75.75 0 001.06 1.06L19.5 13.06l1.72 1.72a.75.75 0 101.06-1.06L20.56 12l1.72-1.72a.75.75 0 00-1.06-1.06L19.5 10.94l-1.72-1.72z" />
+                                        </svg>
+                                    </button>
+                                    <div class="w-16 h-1 bg-white/20 rounded-full cursor-pointer" id="volume-container" onclick="setVolume(event)">
+                                        <div id="volume-progress" class="h-full bg-white rounded-full" style="width: 100%"></div>
+                                    </div>
+                                </div>
+                                
+                                <!-- Time Display -->
+                                <div class="text-white text-sm">
+                                    <span id="current-time-main">0:00</span> / <span id="duration-main">0:00</span>
+                                </div>
+                            </div>
+                            
+                            <div class="flex items-center space-x-3">
+                                <!-- Speed Control -->
+                                <div class="relative">
+                                    <button id="speed-btn" onclick="toggleSpeedMenu()" class="text-white hover:text-primary transition-colors duration-150 text-sm font-medium">
+                                        1x
+                                    </button>
+                                    <div id="speed-menu" class="absolute bottom-8 right-0 bg-slate-800 border border-slate-600 rounded-lg py-2 min-w-16 hidden">
+                                        <button onclick="setSpeed(0.5)" class="block w-full px-3 py-1 text-left text-white hover:bg-slate-700 text-sm">0.5x</button>
+                                        <button onclick="setSpeed(0.75)" class="block w-full px-3 py-1 text-left text-white hover:bg-slate-700 text-sm">0.75x</button>
+                                        <button onclick="setSpeed(1)" class="block w-full px-3 py-1 text-left text-white hover:bg-slate-700 text-sm">1x</button>
+                                        <button onclick="setSpeed(1.25)" class="block w-full px-3 py-1 text-left text-white hover:bg-slate-700 text-sm">1.25x</button>
+                                        <button onclick="setSpeed(1.5)" class="block w-full px-3 py-1 text-left text-white hover:bg-slate-700 text-sm">1.5x</button>
+                                        <button onclick="setSpeed(2)" class="block w-full px-3 py-1 text-left text-white hover:bg-slate-700 text-sm">2x</button>
+                                    </div>
+                                </div>
+                                
+                                <!-- Fullscreen Button -->
+                                <button id="fullscreen-btn" onclick="toggleFullscreen()" class="text-white hover:text-primary transition-colors duration-150">
+                                    <svg id="fullscreen-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                                        <path fill-rule="evenodd" d="M15 3.75a.75.75 0 01.75-.75h4.5a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0V5.56l-3.97 3.97a.75.75 0 11-1.06-1.06l3.97-3.97h-2.69a.75.75 0 01-.75-.75zm-12 0A.75.75 0 013.75 3h4.5a.75.75 0 010 1.5H5.56l3.97 3.97a.75.75 0 01-1.06 1.06L4.5 5.56v2.69A.75.75 0 013 7.5v-4.5zm11.47 11.78a.75.75 0 111.06-1.06l3.97 3.97v-2.69a.75.75 0 011.5 0v4.5a.75.75 0 01-.75.75h-4.5a.75.75 0 010-1.5h2.69l-3.97-3.97zm-4.94-1.06a.75.75 0 010 1.06L5.56 19.5h2.69a.75.75 0 010 1.5h-4.5a.75.75 0 01-.75-.75v-4.5a.75.75 0 011.5 0v2.69l3.97-3.97a.75.75 0 011.06 0z" clip-rule="evenodd" />
+                                    </svg>
+                                    <svg id="exit-fullscreen-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 hidden">
+                                        <path fill-rule="evenodd" d="M9.53 2.47a.75.75 0 010 1.06L6.81 6.25H9.5a.75.75 0 010 1.5H6.75a.75.75 0 01-.75-.75V4.25a.75.75 0 011.5 0v2.69L10.22 4.22a.75.75 0 011.06 0zM2.47 9.53a.75.75 0 011.06 0L6.25 6.81V9.5a.75.75 0 001.5 0V6.75a.75.75 0 00-.75-.75H4.25a.75.75 0 000 1.5h2.69L4.22 10.22a.75.75 0 000 1.06zm16.28 4.94a.75.75 0 01-1.06 0L14.97 11.75H17.5a.75.75 0 000-1.5h-2.75a.75.75 0 00-.75.75v2.75a.75.75 0 001.5 0v-2.69l2.72 2.72a.75.75 0 000 1.06zm-4.94 4.94a.75.75 0 010-1.06L16.53 15.75H14.5a.75.75 0 010-1.5h2.75a.75.75 0 01.75.75v2.75a.75.75 0 01-1.5 0V14.97l-2.72 2.72a.75.75 0 01-1.06 0z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <!-- Loading Spinner -->
+                    <div id="loading-spinner" class="absolute inset-0 flex items-center justify-center bg-black/50 hidden">
+                        <div class="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+                    </div>
+                    
+                    <!-- Center Play Button -->
+                    <div id="center-play-btn" class="absolute inset-0 flex items-center justify-center cursor-pointer" onclick="togglePlay()">
+                        <div class="bg-black/60 rounded-full p-4 hover:bg-black/80 transition-colors duration-200">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-12 h-12 text-white">
+                                <path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
                 </div>
             </div>
 
             <!-- Metadata Sidebar Section -->
             {% include "_video_metadata_sidebar.html" %}
         </div>
+
+        <!-- Video Queue Section -->
+        {% if video_queue %}
+        <div class="mt-8 bg-slate-800 rounded-lg shadow-xl border border-slate-700">
+            <!-- Queue Header (Clickable) -->
+            <div class="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-700/50 transition-colors duration-150 rounded-t-lg" 
+                 onclick="toggleQueue()">
+                <h2 class="text-xl font-semibold text-slate-100 flex items-center">
+                    <span>Up Next</span>
+                    <span class="ml-2 text-slate-400 text-sm">({{ video_queue|length }} videos)</span>
+                </h2>
+                <div class="flex items-center text-slate-400">
+                    <svg id="queue-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" 
+                         class="w-5 h-5 transform transition-transform duration-200">
+                        <path fill-rule="evenodd" d="M12.53 16.28a.75.75 0 01-1.06 0l-7.5-7.5a.75.75 0 011.06-1.06L12 14.69l6.97-6.97a.75.75 0 111.06 1.06l-7.5 7.5z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+            </div>
+            
+            <!-- Queue Content (Collapsible) -->
+            <div id="queue-content" class="border-t border-slate-700">
+                <div class="p-5 pt-4 space-y-3 max-h-96 overflow-y-auto pr-2">
+                    {% for q_video in video_queue %}
+                        <div class="flex items-center justify-between group">
+                            <a href="{{ url_for('video_player_page', video_name=q_video.name) }}" 
+                               class="text-sm {% if q_video.id_db == video.id_db %}text-primary font-semibold{% else %}text-slate-300 hover:text-primary{% endif %} transition-colors duration-150 overflow-hidden whitespace-nowrap text-ellipsis flex-grow" 
+                               title="{{ q_video.display_title }}">
+                                {{ loop.index }}. {{ q_video.display_title }}
+                            </a>
+                        </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
     </main>
 
     <!-- Advanced Transcoding Modal -->
@@ -196,6 +324,295 @@
 
     <script>
         let choicesTagsInstance = null;
+        let video = null;
+        let isVideoReady = false;
+        let currentSpeed = 1;
+
+        // Initialize video player when page loads
+        document.addEventListener('DOMContentLoaded', function() {
+            video = document.getElementById('main-video-player');
+            initializeVideoPlayer();
+        });
+
+        function initializeVideoPlayer() {
+            if (!video) return;
+
+            // Video event listeners
+            video.addEventListener('loadedmetadata', onVideoMetadataLoaded);
+            video.addEventListener('loadeddata', onVideoDataLoaded);
+            video.addEventListener('timeupdate', updateProgress);
+            video.addEventListener('play', onVideoPlay);
+            video.addEventListener('pause', onVideoPause);
+            video.addEventListener('waiting', showLoading);
+            video.addEventListener('canplay', hideLoading);
+            video.addEventListener('ended', onVideoEnded);
+
+            // Timeline event listeners
+            const timelineContainer = document.getElementById('timeline-container');
+            timelineContainer.addEventListener('click', seekTo);
+            timelineContainer.addEventListener('mouseenter', () => {
+                document.getElementById('timeline-handle').style.opacity = '1';
+            });
+            timelineContainer.addEventListener('mouseleave', () => {
+                document.getElementById('timeline-handle').style.opacity = '0';
+            });
+
+            // Hide center play button initially if autoplay
+            updateCenterPlayButton();
+        }
+
+        function togglePlay() {
+            if (!video) return;
+
+            if (video.paused) {
+                video.play();
+            } else {
+                video.pause();
+            }
+        }
+
+        function onVideoPlay() {
+            document.getElementById('play-icon').classList.add('hidden');
+            document.getElementById('pause-icon').classList.remove('hidden');
+            document.getElementById('center-play-btn').classList.add('hidden');
+        }
+
+        function onVideoPause() {
+            document.getElementById('play-icon').classList.remove('hidden');
+            document.getElementById('pause-icon').classList.add('hidden');
+            document.getElementById('center-play-btn').classList.remove('hidden');
+        }
+
+        function onVideoEnded() {
+            document.getElementById('play-icon').classList.remove('hidden');
+            document.getElementById('pause-icon').classList.add('hidden');
+            document.getElementById('center-play-btn').classList.remove('hidden');
+        }
+
+        function onVideoMetadataLoaded() {
+            updateDuration();
+            console.log('Video metadata loaded - duration:', video.duration);
+        }
+
+        function onVideoDataLoaded() {
+            isVideoReady = true;
+            console.log('Video data loaded - ready for seeking');
+        }
+
+        function updateCenterPlayButton() {
+            const centerBtn = document.getElementById('center-play-btn');
+            if (video && video.paused) {
+                centerBtn.classList.remove('hidden');
+            } else {
+                centerBtn.classList.add('hidden');
+            }
+        }
+
+        function showLoading() {
+            document.getElementById('loading-spinner').classList.remove('hidden');
+        }
+
+        function hideLoading() {
+            document.getElementById('loading-spinner').classList.add('hidden');
+        }
+
+        function updateDuration() {
+            if (!video) return;
+            const duration = formatTime(video.duration);
+            document.getElementById('duration').textContent = duration;
+            document.getElementById('duration-main').textContent = duration;
+        }
+
+        function updateProgress() {
+            if (!video) return;
+            
+            const progress = (video.currentTime / video.duration) * 100;
+            const currentTime = formatTime(video.currentTime);
+            
+            document.getElementById('timeline-progress').style.width = progress + '%';
+            document.getElementById('timeline-handle').style.left = progress + '%';
+            document.getElementById('current-time').textContent = currentTime;
+            document.getElementById('current-time-main').textContent = currentTime;
+        }
+
+        function seekTo(event) {
+            if (!video) return;
+            
+            // Check if video is ready for seeking
+            if (!isVideoReady || !video.duration || isNaN(video.duration) || video.duration === 0) {
+                console.log('Video not ready for seeking - ready:', isVideoReady, 'duration:', video.duration);
+                return;
+            }
+            
+            const timelineContainer = document.getElementById('timeline-container');
+            const rect = timelineContainer.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const progress = Math.max(0, Math.min(1, clickX / rect.width)); // Clamp between 0 and 1
+            const newTime = progress * video.duration;
+            
+            // Validate the new time
+            if (isNaN(newTime) || newTime < 0 || newTime > video.duration) {
+                console.log('Invalid seek time calculated:', newTime);
+                return;
+            }
+            
+            try {
+                video.currentTime = newTime;
+                console.log('Seeking to:', newTime, 'seconds (', Math.round(progress * 100), '% )');
+            } catch (error) {
+                console.error('Error seeking video:', error);
+            }
+        }
+
+        function toggleMute() {
+            if (!video) return;
+            
+            video.muted = !video.muted;
+            updateVolumeIcon();
+            updateVolumeBar();
+        }
+
+        function updateVolumeIcon() {
+            const volumeIcon = document.getElementById('volume-icon');
+            const muteIcon = document.getElementById('mute-icon');
+            
+            if (video.muted || video.volume === 0) {
+                volumeIcon.classList.add('hidden');
+                muteIcon.classList.remove('hidden');
+            } else {
+                volumeIcon.classList.remove('hidden');
+                muteIcon.classList.add('hidden');
+            }
+        }
+
+        function updateVolumeBar() {
+            const volumeProgress = document.getElementById('volume-progress');
+            const volume = video.muted ? 0 : video.volume;
+            volumeProgress.style.width = (volume * 100) + '%';
+        }
+
+        function setVolume(event) {
+            if (!video) return;
+            
+            const volumeContainer = document.getElementById('volume-container');
+            const rect = volumeContainer.getBoundingClientRect();
+            const clickX = event.clientX - rect.left;
+            const volume = Math.max(0, Math.min(1, clickX / rect.width));
+            
+            video.volume = volume;
+            video.muted = false;
+            updateVolumeIcon();
+            updateVolumeBar();
+        }
+
+        function toggleSpeedMenu() {
+            const speedMenu = document.getElementById('speed-menu');
+            speedMenu.classList.toggle('hidden');
+        }
+
+        function setSpeed(speed) {
+            if (!video) return;
+            
+            video.playbackRate = speed;
+            currentSpeed = speed;
+            document.getElementById('speed-btn').textContent = speed + 'x';
+            document.getElementById('speed-menu').classList.add('hidden');
+        }
+
+        function toggleFullscreen() {
+            const playerContainer = video.closest('.aspect-video');
+            
+            if (!document.fullscreenElement) {
+                playerContainer.requestFullscreen().catch(err => {
+                    console.log('Error attempting to enable fullscreen:', err);
+                });
+            } else {
+                document.exitFullscreen();
+            }
+        }
+
+        // Listen for fullscreen changes
+        document.addEventListener('fullscreenchange', function() {
+            const fullscreenIcon = document.getElementById('fullscreen-icon');
+            const exitFullscreenIcon = document.getElementById('exit-fullscreen-icon');
+            
+            if (document.fullscreenElement) {
+                fullscreenIcon.classList.add('hidden');
+                exitFullscreenIcon.classList.remove('hidden');
+            } else {
+                fullscreenIcon.classList.remove('hidden');
+                exitFullscreenIcon.classList.add('hidden');
+            }
+        });
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', function(event) {
+            if (!video) return;
+            
+            // Only handle shortcuts when not typing in input fields
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA') {
+                return;
+            }
+            
+            switch(event.code) {
+                case 'Space':
+                    event.preventDefault();
+                    togglePlay();
+                    break;
+                case 'ArrowLeft':
+                    event.preventDefault();
+                    video.currentTime = Math.max(0, video.currentTime - 10);
+                    break;
+                case 'ArrowRight':
+                    event.preventDefault();
+                    video.currentTime = Math.min(video.duration, video.currentTime + 10);
+                    break;
+                case 'ArrowUp':
+                    event.preventDefault();
+                    video.volume = Math.min(1, video.volume + 0.1);
+                    updateVolumeIcon();
+                    updateVolumeBar();
+                    break;
+                case 'ArrowDown':
+                    event.preventDefault();
+                    video.volume = Math.max(0, video.volume - 0.1);
+                    updateVolumeIcon();
+                    updateVolumeBar();
+                    break;
+                case 'KeyM':
+                    event.preventDefault();
+                    toggleMute();
+                    break;
+                case 'KeyF':
+                    event.preventDefault();
+                    toggleFullscreen();
+                    break;
+            }
+        });
+
+        // Close speed menu when clicking outside
+        document.addEventListener('click', function(event) {
+            const speedBtn = document.getElementById('speed-btn');
+            const speedMenu = document.getElementById('speed-menu');
+            
+            if (!speedBtn.contains(event.target) && !speedMenu.contains(event.target)) {
+                speedMenu.classList.add('hidden');
+            }
+        });
+
+        function formatTime(seconds) {
+            if (isNaN(seconds)) return '0:00';
+            
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            } else {
+                return `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
 
         function initializeChoices() {
             const tagsInput = document.getElementById('tags-input');
@@ -331,6 +748,20 @@
                 closeAdvancedTranscodingModal();
             }
         });
+
+        // Toggle queue visibility
+        function toggleQueue() {
+            const queueContent = document.getElementById('queue-content');
+            const chevron = document.getElementById('queue-chevron');
+            
+            if (queueContent.style.display === 'none') {
+                queueContent.style.display = 'block';
+                chevron.classList.remove('rotate-180');
+            } else {
+                queueContent.style.display = 'none';
+                chevron.classList.add('rotate-180');
+            }
+        }
 
         // Handle new transcode event triggered by HX-Trigger from server
         document.body.addEventListener('newTranscodeAvailable', function(event) {

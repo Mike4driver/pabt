@@ -103,10 +103,10 @@
                                 player.poster = newPosterUrl;
                                 this.remove(); // Remove button after success
                                 let statusDiv = document.getElementById('thumbnail-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class='text-green-400 text-xs mt-2'>Thumbnail generated and updated!</p>';
+                                if(statusDiv) statusDiv.innerHTML = '<p class=\"text-green-400 text-xs mt-2\">Thumbnail generated and updated!</p>';
                             } else {
                                 let statusDiv = document.getElementById('thumbnail-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class='text-red-400 text-xs mt-2'>Failed to get thumbnail URL from response.</p>';
+                                if(statusDiv) statusDiv.innerHTML = '<p class=\"text-red-400 text-xs mt-2\">Failed to get thumbnail URL from response.</p>';
                             }
                         "
                         class="w-full bg-amber-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
@@ -121,10 +121,8 @@
                         hx-post="{{ url_for('transcode_specific_video_endpoint', video_name=video.name) }}"
                         hx-indicator="#transcode-spinner-{{ video.name | slugify_for_id }}"
                         hx-on::after-request="
-                            this.innerText = 'Transcoding Started (refresh to play)'; 
-                            this.disabled = true;
-                            let statusDiv = document.getElementById('transcode-status-message-{{ video.name | slugify_for_id }}');
-                            if(statusDiv) statusDiv.innerHTML = '<p class='text-sky-400 text-xs mt-2'>Transcoding initiated. Refresh the page after a while to see if the transcoded version is available.</p>';
+                            // Trigger a page refresh after transcoding request to update the button visibility
+                            window.location.reload();
                         "
                         class="w-full bg-sky-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
                         <span id="transcode-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
@@ -143,12 +141,12 @@
                                 this.innerText = 'Preview Generated'; 
                                 this.disabled = true;
                                 let statusDiv = document.getElementById('preview-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class='text-purple-400 text-xs mt-2'>Hover preview generated! It will be used in the media browser.</p>';
+                                if(statusDiv) statusDiv.innerHTML = '<p class=\"text-purple-400 text-xs mt-2\">Hover preview generated! It will be used in the media browser.</p>';
                                 // Optionally, update video.has_preview and video.preview_url if we were managing state here
                             } else {
                                 this.innerText = 'Preview Generation Failed';
                                 let statusDiv = document.getElementById('preview-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class='text-red-400 text-xs mt-2'>Failed to generate preview. Check logs.</p>';
+                                if(statusDiv) statusDiv.innerHTML = '<p class=\"text-red-400 text-xs mt-2\">Failed to generate preview. Check logs.</p>';
                             }
                         "
                         class="w-full bg-purple-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">

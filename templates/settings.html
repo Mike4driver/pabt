@@ -67,6 +67,19 @@
                         Special characters and paths (slashes) are not allowed.
                     </p>
                 </div>
+                
+                <div>
+                    <label for="media_grid_size_input" class="block text-sm font-medium text-slate-300 mb-2">Media Grid Size</label>
+                    <select name="media_grid_size" id="media_grid_size_input"
+                            class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="small">Small (More items per row)</option>
+                        <option value="medium">Medium (Default)</option>
+                        <option value="large">Large (Fewer items per row)</option>
+                    </select>
+                    <p class="mt-2 text-xs text-slate-400">
+                        Choose how many media items to display per row in the grid. Small shows more items, Large shows fewer but bigger items.
+                    </p>
+                </div>
 
                 <button type="submit" 
                         class="w-full bg-primary text-white font-semibold py-3 px-6 rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-base">
@@ -78,6 +91,7 @@
             <div class="mt-8 p-4 bg-slate-700/50 rounded-md">
                 <h3 class="text-sm font-medium text-slate-300 mb-1">Current Configuration:</h3>
                 <p class="text-xs text-slate-400">Media Directory: <code id="current-media-dir-display" class="font-mono">Loading...</code></p>
+                <p class="text-xs text-slate-400">Grid Size: <code id="current-grid-size-display" class="font-mono">Loading...</code></p>
                 <p class="mt-3 text-xs text-amber-400/80">
                     <strong>Important:</strong> After saving, you must restart the application for changes to the media directory to take full effect.
                 </p>
@@ -91,12 +105,18 @@
                 .then(response => response.json())
                 .then(data => {
                     const mediaDirName = data.media_directory_name || '{{ DEFAULT_MEDIA_SUBDIR_JS }}'; // Use JS default if needed
+                    const gridSize = data.media_grid_size || 'medium';
+                    
                     document.getElementById('media_directory_name_input').value = mediaDirName;
                     document.getElementById('current-media-dir-display').textContent = mediaDirName;
+                    
+                    document.getElementById('media_grid_size_input').value = gridSize;
+                    document.getElementById('current-grid-size-display').textContent = gridSize;
                 })
                 .catch(error => {
                     console.error('Error fetching current config:', error);
                     document.getElementById('current-media-dir-display').textContent = 'Error loading config';
+                    document.getElementById('current-grid-size-display').textContent = 'Error loading config';
                 });
         }
 
