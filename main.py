@@ -12,6 +12,10 @@ from mutagen import File
 import shutil
 from datetime import timedelta
 import json # For config file
+import sqlite3 # For type hinting if needed later
+from database import get_db_connection, create_tables, get_setting, update_setting
+from typing import Optional, List
+from pydantic import BaseModel
 
 # Set up logging
 logging.basicConfig(level=logging.INFO)
@@ -19,40 +23,223 @@ logger = logging.getLogger(__name__)
 
 app = FastAPI()
 
+# --- Database Initialization ---
+# This will create tables if they don't exist and initialize settings
+# if the DB is new, potentially reading from config.json for the first run.
+create_tables()
+
+
 # --- Directory Setup & Configuration --- 
 BASE_DIR = Path(__file__).resolve().parent
-CONFIG_FILE = BASE_DIR / "config.json"
+DEFAULT_MEDIA_SUBDIR = "media" # Define this for settings_page JS fallback
+# CONFIG_FILE = BASE_DIR / "config.json" # Keep for initial DB population, but DB is source of truth now
 
-DEFAULT_MEDIA_SUBDIR = "media" # Default if not in config
+# DEFAULT_MEDIA_SUBDIR = "media" # Default if not in config or DB
 
-def load_config() -> dict:
-    if CONFIG_FILE.exists():
-        try:
-            with open(CONFIG_FILE, 'r') as f:
-                config = json.load(f)
-                logger.info(f"Loaded configuration: {config}")
-                return config
-        except json.JSONDecodeError:
-            logger.error(f"Error decoding {CONFIG_FILE}. Using default configuration.")
-        except Exception as e:
-            logger.error(f"Error loading {CONFIG_FILE}: {e}. Using default configuration.")
-    return {"media_directory_name": DEFAULT_MEDIA_SUBDIR} # Default structure
+# def load_config() -> dict: # Old function, will be replaced by DB access
+#     if CONFIG_FILE.exists():
+#         try:
+#             with open(CONFIG_FILE, 'r') as f:
+#                 config = json.load(f)
+#                 logger.info(f"Loaded configuration from config.json: {config}")
+#                 return config
+#         except json.JSONDecodeError:
+#             logger.error(f"Error decoding {CONFIG_FILE}. Using default configuration.")
+#         except Exception as e:
+#             logger.error(f"Error loading {CONFIG_FILE}: {e}. Using default configuration.")
+#     return {"media_directory_name": get_setting("media_directory_name") or DEFAULT_MEDIA_SUBDIR}
 
-def save_config(config: dict):
-    try:
-        with open(CONFIG_FILE, 'w') as f:
-            json.dump(config, f, indent=4)
-        logger.info(f"Saved configuration: {config}")
-    except Exception as e:
-        logger.error(f"Error saving {CONFIG_FILE}: {e}")
+# def save_config(config: dict): # Old function, will be replaced by DB access
+#     try:
+#         # Also update the database
+#         if "media_directory_name" in config:
+#             update_setting("media_directory_name", config["media_directory_name"])
+#         # Optionally, still write to config.json for backup or external reference,
+#         # but the DB is the primary source of truth.
+#         with open(CONFIG_FILE, 'w') as f:
+#             json.dump(config, f, indent=4)
+#         logger.info(f"Saved configuration to config.json and DB: {config}")
+#     except Exception as e:
+#         logger.error(f"Error saving configuration: {e}")
 
-# Load configuration and set MEDIA_DIR
-app_config = load_config()
-# Media directory is now relative to BASE_DIR, based on config or default
-MEDIA_DIR_NAME = app_config.get("media_directory_name", DEFAULT_MEDIA_SUBDIR)
+
+# Load configuration and set MEDIA_DIR from Database
+MEDIA_DIR_NAME = get_setting("media_directory_name")
+if not MEDIA_DIR_NAME:
+    logger.warning("Media directory name not found in database settings. Falling back to 'media'.")
+    MEDIA_DIR_NAME = "media" # Fallback, should have been set by create_tables
+    update_setting("media_directory_name", MEDIA_DIR_NAME) # Ensure it's in DB for next time
+
 MEDIA_DIR = BASE_DIR / MEDIA_DIR_NAME
+logger.info(f"Media directory set to: {MEDIA_DIR}")
 
-TRANSCODED_DIR = BASE_DIR / "media_transcoded" # For transcoded videos
+
+# --- Media Scanning and Database Sync ---
+def scan_media_directory_and_update_db():
+    """
+    Scans the MEDIA_DIR for supported files, extracts metadata, 
+    and updates the media_files table in the database.
+    Also removes entries for files that no longer exist.
+    """
+    logger.info(f"Starting media scan in directory: {MEDIA_DIR}")
+    if not MEDIA_DIR.exists() or not MEDIA_DIR.is_dir():
+        logger.error(f"Media directory {MEDIA_DIR} does not exist or is not a directory. Skipping scan.")
+        return
+
+    conn = None
+    try:
+        conn = get_db_connection()
+        cursor = conn.cursor()
+
+        # Get all filenames currently in the database to find orphans later
+        cursor.execute("SELECT id, filename, original_path FROM media_files")
+        db_files_tuples = cursor.fetchall()
+        db_files_map = {Path(row['original_path']).name: row['id'] for row in db_files_tuples}
+        
+        found_files_in_scan = set()
+
+        for file_path_obj in MEDIA_DIR.iterdir():
+            if file_path_obj.is_file():
+                filename = file_path_obj.name
+                original_path_str = str(file_path_obj.resolve())
+                found_files_in_scan.add(filename)
+
+                media_type = None
+                suffix = file_path_obj.suffix.lower()
+                if suffix in ['.mp4', '.avi', '.mov', '.mkv']: media_type = 'video'
+                elif suffix in ['.mp3', '.wav', '.ogg']: media_type = 'audio'
+                elif suffix in ['.jpg', '.jpeg', '.png', '.gif']: media_type = 'image'
+                else:
+                    # logger.debug(f"Skipping unsupported file type: {filename}")
+                    continue
+
+                logger.info(f"Processing file: {filename} (Type: {media_type})")
+
+                # Check if file already exists in DB by original_path
+                cursor.execute("SELECT id, last_scanned FROM media_files WHERE original_path = ?", (original_path_str,))
+                existing_file = cursor.fetchone()
+
+                # For now, we re-scan metadata each time.
+                # Later, we can add a check for file modification time if needed for performance.
+                # if existing_file and (datetime.now() - datetime.fromisoformat(existing_file['last_scanned'])).total_seconds() < 3600: # e.g. re-scan if older than 1 hour
+                #     logger.info(f"File {filename} recently scanned. Skipping full metadata refresh.")
+                #     continue
+
+                duration = get_media_duration(file_path_obj) # Returns string like HH:MM:SS or None
+                duration_seconds = None
+                if duration:
+                    parts = list(map(int, duration.split(':')))
+                    duration_seconds = timedelta(hours=parts[0], minutes=parts[1], seconds=parts[2]).total_seconds()
+
+                width, height, fps = None, None, None
+                size_bytes = file_path_obj.stat().st_size
+                
+                # More detailed metadata, especially for video
+                # For videos, try to get resolution and FPS (example, needs refinement)
+                if media_type == 'video':
+                    try:
+                        clip = VideoFileClip(str(file_path_obj.resolve()))
+                        width, height = clip.size
+                        fps = clip.fps
+                        clip.close()
+                    except Exception as e:
+                        logger.warning(f"Could not get video metadata for {filename}: {e}")
+                elif media_type == 'image':
+                    try:
+                        with Image.open(file_path_obj.resolve()) as img:
+                            width, height = img.size
+                    except Exception as e:
+                        logger.warning(f"Could not get image metadata for {filename}: {e}")
+                
+                # Thumbnail, transcode, preview paths (these are potential paths, existence checked separately)
+                # These functions might need adjustment to not assume MEDIA_DIR directly
+                # but work with the provided file_path_obj
+                display_thumb_url = get_display_thumbnail_url(file_path_obj, media_type) # this returns a URL
+                # We need to store the *relative static path* or an indicator if it's generic
+                actual_thumbnail_p = get_thumbnail_path(file_path_obj)
+                has_specific_thumbnail = actual_thumbnail_p.exists()
+                db_thumbnail_path = str(actual_thumbnail_p.relative_to(BASE_DIR)) if has_specific_thumbnail else None
+                
+                transcoded_p = TRANSCODED_DIR / f"{slugify_for_id(file_path_obj.stem)}.mp4" # Example, align with transcode_video output
+                has_transcoded_version = transcoded_p.exists()
+                db_transcoded_path = str(transcoded_p.relative_to(BASE_DIR)) if has_transcoded_version else None
+
+                preview_p = get_preview_path(file_path_obj)
+                has_preview = preview_p.exists()
+                db_preview_path = str(preview_p.relative_to(BASE_DIR)) if has_preview else None
+
+                metadata_dict = {"source": "filesystem_scan"} # Basic metadata
+                if width and height: metadata_dict['resolution'] = f"{width}x{height}"
+                if fps: metadata_dict['fps'] = round(fps, 2)
+                
+                metadata_json_str = json.dumps(metadata_dict)
+
+                if existing_file:
+                    # Update existing record
+                    # Only update scan-related fields, preserve user_title and tags
+                    logger.debug(f"Updating existing DB entry for: {filename} (scan data only)")
+                    cursor.execute("""
+                        UPDATE media_files 
+                        SET media_type=?, duration=?, width=?, height=?, fps=?, size_bytes=?, 
+                            last_scanned=CURRENT_TIMESTAMP, thumbnail_path=?, has_specific_thumbnail=?, 
+                            transcoded_path=?, has_transcoded_version=?, preview_path=?, has_preview=?,
+                            metadata_json=?
+                        WHERE id=?
+                    """, (media_type, duration_seconds, width, height, fps, size_bytes, 
+                          db_thumbnail_path, has_specific_thumbnail, 
+                          db_transcoded_path, has_transcoded_version, db_preview_path, has_preview,
+                          metadata_json_str, existing_file['id']))
+                else:
+                    # Insert new record
+                    logger.debug(f"Adding new DB entry for: {filename}")
+                    cursor.execute("""
+                        INSERT INTO media_files 
+                            (filename, original_path, media_type, user_title, duration, width, height, fps, size_bytes, 
+                             last_scanned, thumbnail_path, has_specific_thumbnail, 
+                             transcoded_path, has_transcoded_version, preview_path, has_preview, 
+                             tags, metadata_json)
+                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?)
+                    """, (filename, original_path_str, media_type, None, # user_title defaults to None (NULL)
+                          duration_seconds, width, height, fps, size_bytes,
+                          db_thumbnail_path, has_specific_thumbnail, 
+                          db_transcoded_path, has_transcoded_version, db_preview_path, has_preview, 
+                          '[]', metadata_json_str)) # tags default to empty JSON list
+                
+                conn.commit()
+
+        # Remove orphaned files from DB (files in DB but not found in current scan)
+        db_filenames_set = set(db_files_map.keys())
+        orphaned_filenames = db_filenames_set - found_files_in_scan
+        if orphaned_filenames:
+            logger.info(f"Found orphaned files in DB (will be removed): {orphaned_filenames}")
+            for orphaned_file_name in orphaned_filenames:
+                file_id_to_delete = db_files_map[orphaned_file_name]
+                # Optionally, before deleting, consider if we should remove associated generated files
+                # (thumbnails, transcodes, previews) from disk. For now, just DB record.
+                cursor.execute("DELETE FROM media_files WHERE id = ?", (file_id_to_delete,))
+                logger.info(f"Removed orphaned DB entry for: {orphaned_file_name} (ID: {file_id_to_delete})")
+            conn.commit()
+
+        logger.info("Media scan and database update completed.")
+
+    except sqlite3.Error as e:
+        logger.error(f"SQLite error during media scan: {e}")
+        if conn:
+            conn.rollback() # Rollback any partial changes if an error occurs
+    except Exception as e:
+        logger.error(f"Unexpected error during media scan: {e}")
+        if conn:
+            conn.rollback()
+    finally:
+        if conn:
+            conn.close()
+
+# Call the scan function on startup
+# This ensures the DB is populated/updated when the app starts.
+# scan_media_directory_and_update_db() # Will be called after MEDIA_DIR is fully confirmed.
+
+
+TRANSCODED_DIR = BASE_DIR / "media_transcoded"
 PREVIEWS_DIR = BASE_DIR / "static" / "previews"   # For hover previews
 THUMBNAILS_DIR = BASE_DIR / "static" / "thumbnails"
 STATIC_ICONS_DIR = BASE_DIR / "static" / "icons"
@@ -240,108 +427,175 @@ def get_preview_path(file_path: Path):
     slugified_stem = slugify_for_id(file_path.stem)
     return PREVIEWS_DIR / f"{slugified_stem}_preview.mp4"
 
-def get_media_files(search_query: str = None):
-    media_files = []
-    for file_path_obj in MEDIA_DIR.iterdir():
-        if file_path_obj.is_file():
-            suffix = file_path_obj.suffix.lower()
-            supported_video = ['.mp4', '.avi', '.mov', '.mkv'] # Original supported videos
-            supported_audio = ['.mp3', '.wav', '.ogg']
-            supported_image = ['.jpg', '.jpeg', '.png', '.gif']
-
-            if not (suffix in supported_video + supported_audio + supported_image):
-                continue
-            if search_query and search_query.lower() not in file_path_obj.name.lower():
-                continue
-            
-            media_type = 'video' if suffix in supported_video else \
-                       'audio' if suffix in supported_audio else 'image'
-
-            display_thumbnail = get_display_thumbnail_url(file_path_obj, media_type)
-            duration = get_media_duration(file_path_obj) if media_type in ['video', 'audio'] else None
-            
-            # Use slugified stem for default transcoded file checks and path construction
-            slugified_stem = slugify_for_id(file_path_obj.stem)
-            transcoded_file_path_default = TRANSCODED_DIR / f"{slugified_stem}.mp4"
-            has_transcoded_version = transcoded_file_path_default.exists() and media_type == 'video'
-            
-            preview_file_path = get_preview_path(file_path_obj) # Already uses slugification internally
-            has_preview = preview_file_path.exists() and media_type == 'video'
-            preview_url = f"/static/previews/{preview_file_path.name}" if has_preview else None
-
-            playable_path = f"/media_content/{file_path_obj.name}" # Default to original
-            if has_transcoded_version:
-                # If default transcoded version exists, it becomes the primary playable version
-                playable_path = f"/media_content_transcoded/{transcoded_file_path_default.name}"
-
-            media_files.append({
-                "name": file_path_obj.name, # Keep original name for display and non-transcoded operations
-                "type": media_type,
-                "slugified_stem": slugified_stem, # Add slugified stem for convenience if needed elsewhere
-                "size": file_path_obj.stat().st_size,
-                "thumbnail": display_thumbnail,
-                "has_specific_thumbnail": get_thumbnail_path(file_path_obj).exists(), # get_thumbnail_path now uses slugify
-                "duration": duration,
-                "path": playable_path,
-                "original_path_for_download": f"/media_content/{file_path_obj.name}",
-                "has_transcoded_version": has_transcoded_version, # This now refers to the default slugified transcode
-                "has_preview": has_preview,
-                "preview_url": preview_url
-            })
-    return media_files
-
-def get_single_video_details(video_name: str):
-    original_video_path = MEDIA_DIR / video_name
-    if not original_video_path.exists() or not original_video_path.is_file():
+def format_media_duration(seconds: float | None) -> str | None:
+    if seconds is None:
         return None
+    return str(timedelta(seconds=int(seconds)))
 
-    slugified_stem = slugify_for_id(Path(video_name).stem)
-    transcoded_video_path_default = TRANSCODED_DIR / f"{slugified_stem}.mp4"
-    has_transcoded_version = transcoded_video_path_default.exists()
+def get_media_files_from_db(search_query: str = None):
+    """Fetches media files from the database, optionally filtering by search_query."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
 
-    preview_file_path = get_preview_path(original_video_path) # Already uses slugification
-    has_preview = preview_file_path.exists()
-    preview_url = f"/static/previews/{preview_file_path.name}" if has_preview else None
+    query = "SELECT * FROM media_files"
+    params = []
+    if search_query:
+        query += " WHERE filename LIKE ?"
+        params.append(f"%{search_query}%")
+    query += " ORDER BY date_added DESC"
 
-    playable_path = f"/media_content/{video_name}" # Default to original
-    if has_transcoded_version:
-        playable_path = f"/media_content_transcoded/{transcoded_video_path_default.name}"
+    cursor.execute(query, params)
+    db_rows = cursor.fetchall()
+    conn.close()
 
-    try:
-        clip = VideoFileClip(str(original_video_path.resolve()))
-        details = {
-            "name": video_name,
-            "type": "video",
-            "slugified_stem": slugified_stem,
-            "path": playable_path,
-            "original_path_for_download": f"/media_content/{video_name}",
-            "duration": str(timedelta(seconds=int(clip.duration))),
-            "resolution": f"{clip.size[0]}x{clip.size[1]}",
-            "size": original_video_path.stat().st_size,
-            "fps": clip.fps,
-            "thumbnail": get_display_thumbnail_url(original_video_path, 'video'), # get_display_thumbnail_url uses get_thumbnail_path, which slugs
-            "has_specific_thumbnail": get_thumbnail_path(original_video_path).exists(),
-            "has_transcoded_version": has_transcoded_version, # This now refers to the default slugified transcode
-            "has_preview": has_preview,
-            "preview_url": preview_url
+    media_list = []
+    for row in db_rows:
+        # Convert DB row to the dictionary structure expected by templates
+        # Ensure paths are converted to URLs for the frontend
+        thumbnail_url = None
+        if row['has_specific_thumbnail'] and row['thumbnail_path']:
+            # Assuming thumbnail_path is stored relative to BASE_DIR e.g. "static/thumbnails/file.jpg"
+            thumbnail_url = f"/{row['thumbnail_path'].replace('\\', '/')}" 
+        else:
+            # Fallback to generic icons based on media_type
+            if row['media_type'] == 'video': thumbnail_url = "/static/icons/generic-video-icon.svg"
+            elif row['media_type'] == 'image': thumbnail_url = "/static/icons/generic-image-icon.svg"
+            elif row['media_type'] == 'audio': thumbnail_url = "/static/icons/generic-audio-icon.svg"
+        
+        playable_path_url = None
+        original_path_for_download_url = f"/media_content/{row['filename']}" # Default to original
+        
+        if row['has_transcoded_version'] and row['transcoded_path']:
+            playable_path_url = f"/media_content_transcoded/{Path(row['transcoded_path']).name}"
+        else:
+            playable_path_url = original_path_for_download_url
+
+        preview_url = None
+        if row['has_preview'] and row['preview_path']:
+            preview_url = f"/{row['preview_path'].replace('\\', '/')}"
+
+        display_name = row['user_title'] if row['user_title'] else row['filename']
+        tags_list = json.loads(row['tags']) if row['tags'] else []
+
+        media_item = {
+            "id_db": row['id'], # Actual database ID
+            "name": row['filename'], # Original filename, used for fetching/linking media content
+            "display_title": display_name, # User title or filename for display
+            "user_title": row['user_title'], # Actual user_title from DB
+            "path": playable_path_url, # Path to play (transcoded if available, else original)
+            "original_path_for_download": original_path_for_download_url,
+            "type": row['media_type'],
+            "thumbnail": thumbnail_url, # This should now be the correct URL or generic icon path
+            "duration": format_media_duration(row['duration']), # Format seconds to HH:MM:SS
+            "id": slugify_for_id(row['filename']), # slugify filename for html id
+            "has_specific_thumbnail": bool(row['has_specific_thumbnail']),
+            "has_transcoded_version": bool(row['has_transcoded_version']),
+            "has_preview": bool(row['has_preview']),
+            "preview_url": preview_url,
+            "tags": tags_list,
+            "size_bytes": row['size_bytes'],
+            "resolution": json.loads(row['metadata_json']).get('resolution') if row['metadata_json'] else None,
+            "original_full_path": row['original_path'] # Keep for backend operations if needed
         }
-        clip.close()
-        return details
-    except Exception as e:
-        logger.error(f"Error getting details for video {video_name}: {e}")
+        media_list.append(media_item)
+    
+    return media_list
+
+# Remove or comment out the old get_media_files function
+# def get_media_files(search_query: str = None):
+#     media_files = []
+#     for file_path_obj in MEDIA_DIR.iterdir():
+# ... (old implementation) ...
+#     return media_files
+
+def get_single_video_details_from_db(video_filename: str):
+    """Fetches detailed information for a single video from the database by its filename."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Assuming filename is unique in the media_files table for videos
+    cursor.execute("SELECT * FROM media_files WHERE filename = ? AND media_type = 'video'", (video_filename,))
+    row = cursor.fetchone()
+    conn.close()
+
+    if not row:
         return None
 
-# --- Endpoints ---
+    thumbnail_url = None
+    if row['has_specific_thumbnail'] and row['thumbnail_path']:
+        thumbnail_url = f"/{row['thumbnail_path'].replace('\\', '/')}"
+    else:
+        thumbnail_url = "/static/icons/generic-video-icon.svg" # Video specific
+
+    playable_path_url = None
+    original_path_for_download_url = f"/media_content/{row['filename']}"
+
+    if row['has_transcoded_version'] and row['transcoded_path']:
+        playable_path_url = f"/media_content_transcoded/{Path(row['transcoded_path']).name}"
+    else:
+        playable_path_url = original_path_for_download_url
+    
+    preview_url = None
+    if row['has_preview'] and row['preview_path']:
+        preview_url = f"/{row['preview_path'].replace('\\', '/')}"
+
+    display_name = row['user_title'] if row['user_title'] else row['filename']
+    tags_list = json.loads(row['tags']) if row['tags'] else []
+
+    # Extract structured metadata from JSON if available
+    metadata = json.loads(row['metadata_json']) if row['metadata_json'] else {}
+    resolution = metadata.get('resolution', f"{row['width']}x{row['height']}" if row['width'] and row['height'] else 'N/A')
+    fps = metadata.get('fps', row['fps'] if row['fps'] else 'N/A')
+
+    video_details = {
+        "id_db": row['id'],
+        "name": row['filename'],
+        "display_title": display_name,
+        "user_title": row['user_title'],
+        "path": playable_path_url,
+        "original_path_for_download": original_path_for_download_url,
+        "type": row['media_type'], # Should be 'video'
+        "thumbnail": thumbnail_url,
+        "duration": format_media_duration(row['duration']), # Assumes duration is in seconds
+        "id": slugify_for_id(row['filename']),
+        "has_specific_thumbnail": bool(row['has_specific_thumbnail']),
+        "has_transcoded_version": bool(row['has_transcoded_version']),
+        "has_preview": bool(row['has_preview']),
+        "preview_url": preview_url,
+        "tags": tags_list,
+        "size": row['size_bytes'], # Raw bytes
+        "resolution": resolution,
+        "fps": fps,
+        "original_full_path": row['original_path'] # For backend operations
+        # Add any other specific fields needed for the video player page
+    }
+    return video_details
+
+# Comment out or remove old get_single_video_details
+# def get_single_video_details(video_name: str):
+# ... (old implementation) ...
+# return None
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request})
+    return templates.TemplateResponse("index.html", {"request": request, "title": "Media Browser"})
 
 @app.get("/files", response_class=HTMLResponse)
-async def list_files(request: Request, search: str = None):
-    files = get_media_files(search)
-    return templates.TemplateResponse("file_list.html", {"request": request, "files": files})
+async def list_files(request: Request, search: str = Query(None)):
+    # Use the new database-driven function
+    media_items = get_media_files_from_db(search_query=search)
+    # Pass MEDIA_DIR_NAME and MEDIA_DIR to the template for the info message
+    return templates.TemplateResponse(
+        "file_list.html", 
+        {
+            "request": request, 
+            "media_files": media_items, 
+            "search_query": search or "",
+            "MEDIA_DIR_NAME_FOR_TEMPLATE": MEDIA_DIR_NAME, # Pass the actual name used
+            "MEDIA_DIR_PATH_FOR_TEMPLATE": str(MEDIA_DIR.resolve()) # Pass the resolved full path
+        }
+    )
 
-@app.get("/media_content/{file_name:path}") # Added :path to handle potential subdirs if media grows
+@app.get("/media_content/{file_name:path}")
 async def serve_media_file(file_name: str, request: Request):
     file_path = MEDIA_DIR / file_name
     if not file_path.exists() or not file_path.is_file():
@@ -357,62 +611,171 @@ async def serve_transcoded_media_file(file_name: str, request: Request):
 
 @app.get("/video/{video_name:path}", response_class=HTMLResponse)
 async def video_player_page(request: Request, video_name: str):
-    video_details = get_single_video_details(video_name)
+    video_details = get_single_video_details_from_db(video_name)
     if not video_details:
-        raise HTTPException(status_code=404, detail="Video not found")
+        raise HTTPException(status_code=404, detail="Video not found in database")
+    
+    # The following paths are used by buttons on the video player page
+    # They need to be derived correctly based on the video_details from DB
+    # (or the functions they call need to be updated to use DB info)
+    
+    # For thumbnail generation, ensure it uses original_full_path if needed
+    # For transcoding, ensure it uses original_full_path
+    
     return templates.TemplateResponse("video_player.html", {"request": request, "video": video_details})
+
+@app.get("/tools/media-processing", response_class=HTMLResponse)
+async def thumbnail_tools_page(request: Request): # Name matches url_for in index.html
+    return templates.TemplateResponse("tools_page.html", {"request": request})
 
 @app.post("/generate-thumbnail/{video_name:path}")
 async def generate_specific_thumbnail_endpoint(video_name: str, response: Response):
-    video_path = MEDIA_DIR / video_name
-    if not video_path.exists() or not video_path.is_file() or video_path.suffix.lower() not in ['.mp4', '.avi', '.mov', '.mkv']:
-        raise HTTPException(status_code=404, detail="Video not found or not a supported video type")
-    thumbnail_url = _actually_create_thumbnail(video_path, force_creation=True)
+    # Find the video in the database to get its original_path
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT original_path FROM media_files WHERE filename = ? AND media_type = 'video'", (video_name,))
+    db_row = cursor.fetchone()
+    # conn.close() # Close after all DB ops for this request
+
+    if not db_row:
+        # conn.close()
+        raise HTTPException(status_code=404, detail=f"Video '{video_name}' not found in database.")
+    
+    original_file_path = Path(db_row['original_path'])
+    if not original_file_path.exists():
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Original media file for '{video_name}' not found at {original_file_path}.")
+
+    thumbnail_url = _actually_create_thumbnail(original_file_path, force_creation=True)
+
     if thumbnail_url:
+        # Update database
+        actual_thumbnail_p = get_thumbnail_path(original_file_path)
+        db_thumbnail_path_str = str(actual_thumbnail_p.relative_to(BASE_DIR)) if actual_thumbnail_p.exists() else None
+        
+        if db_thumbnail_path_str:
+            try:
+                # conn = get_db_connection() # Re-open if closed, or ensure it's open
+                # cursor = conn.cursor()
+                cursor.execute("UPDATE media_files SET thumbnail_path = ?, has_specific_thumbnail = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ?", 
+                               (db_thumbnail_path_str, video_name))
+                conn.commit()
+                logger.info(f"Database updated for new thumbnail of {video_name}.")
+            except sqlite3.Error as e:
+                logger.error(f"Failed to update database for thumbnail {video_name}: {e}")
+                # Decide if we should raise an HTTP error or just log
+        else:
+            logger.warning(f"Thumbnail was reportedly created for {video_name}, but path was not resolvable for DB update.")
+
         response.headers["X-Thumbnail-Url"] = thumbnail_url
         return {"message": f"Thumbnail generated for {video_name}", "thumbnail_url": thumbnail_url}
     else:
+        conn.close()
         raise HTTPException(status_code=500, detail=f"Failed to generate thumbnail for {video_name}")
+    conn.close() # Ensure connection is closed
 
 @app.post("/generate-all-video-thumbnails")
 async def generate_all_thumbnails_endpoint():
-    generated_count = 0; failed_count = 0
-    video_files = [f for f in MEDIA_DIR.iterdir() if f.is_file() and f.suffix.lower() in ['.mp4', '.avi', '.mov', '.mkv']]
-    for video_file in video_files:
-        if not get_thumbnail_path(video_file).exists(): 
-            if _actually_create_thumbnail(video_file, force_creation=True): generated_count += 1
-            else: failed_count += 1
-    return {"message": f"Thumbnail generation completed. Generated: {generated_count}, Failed: {failed_count}.", "generated": generated_count, "failed": failed_count}
+    # Get all video files from DB that don't have a specific thumbnail
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT filename, original_path FROM media_files WHERE media_type = 'video' AND (has_specific_thumbnail = FALSE OR thumbnail_path IS NULL)")
+    videos_to_process = cursor.fetchall()
+    # conn.close() # Keep open for updates within the loop
 
-@app.get("/tools/thumbnails", response_class=HTMLResponse)
-async def thumbnail_tools_page(request: Request):
-    # This page will now be more comprehensive
-    return templates.TemplateResponse("tools_page.html", {"request": request})
+    generated_count = 0
+    failed_count = 0
+
+    if not videos_to_process:
+        conn.close()
+        return {"message": "No video thumbnails to generate. All videos either have thumbnails or are not registered.", "generated": 0, "failed": 0}
+
+    logger.info(f"Starting bulk thumbnail generation for {len(videos_to_process)} videos.")
+
+    for video_row in videos_to_process:
+        video_filename = video_row['filename']
+        original_file_path = Path(video_row['original_path'])
+        
+        logger.info(f"Generating thumbnail for: {video_filename}")
+        if not original_file_path.exists():
+            logger.warning(f"Original file for {video_filename} not found at {original_file_path}, skipping thumbnail.")
+            failed_count += 1
+            continue
+
+        thumbnail_url = _actually_create_thumbnail(original_file_path, force_creation=True)
+        if thumbnail_url:
+            actual_thumbnail_p = get_thumbnail_path(original_file_path)
+            db_thumbnail_path_str = str(actual_thumbnail_p.relative_to(BASE_DIR)) if actual_thumbnail_p.exists() else None
+            if db_thumbnail_path_str:
+                try:
+                    # cursor = conn.cursor() # Cursor should still be valid
+                    cursor.execute("UPDATE media_files SET thumbnail_path = ?, has_specific_thumbnail = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ?", 
+                                   (db_thumbnail_path_str, video_filename))
+                    conn.commit() # Commit after each successful generation and DB update
+                    logger.info(f"DB updated for new thumbnail of {video_filename}.")
+                    generated_count += 1
+                except sqlite3.Error as e:
+                    logger.error(f"DB update failed for thumbnail {video_filename}: {e}")
+                    conn.rollback() # Rollback failed update for this file
+                    failed_count += 1
+            else:
+                 logger.warning(f"Thumbnail created for {video_filename}, but path not resolvable for DB. Not counted as failure but needs review.")
+                 failed_count +=1 # Or a new category like 'generated_no_db_update'
+        else:
+            logger.error(f"Failed to generate thumbnail for {video_filename}.")
+            failed_count += 1
+            
+    conn.close()
+    return {"message": f"Bulk thumbnail generation complete. Generated: {generated_count}, Failed: {failed_count}", "generated": generated_count, "failed": failed_count}
 
 # --- NEW TRANSCODING ENDPOINTS ---
 @app.post("/transcode-video/{video_name:path}")
 async def transcode_specific_video_endpoint(video_name: str):
-    original_path = MEDIA_DIR / video_name
-    slugified_stem = slugify_for_id(original_path.stem)
-    transcoded_path = TRANSCODED_DIR / f"{slugified_stem}.mp4"
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT original_path FROM media_files WHERE filename = ? AND media_type = 'video'", (video_name,))
+    db_row = cursor.fetchone()
 
-    if not original_path.exists() or not original_path.is_file():
-        raise HTTPException(status_code=404, detail="Original video not found.")
-    if original_path.suffix.lower() not in ['.mp4', '.avi', '.mov', '.mkv']:
-        raise HTTPException(status_code=400, detail="File is not a supported video type for transcoding.")
+    if not db_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Video '{video_name}' not found in database.")
 
-    logger.info(f"Attempting to transcode: {original_path} to {transcoded_path}")
-    success = transcode_video(original_path, transcoded_path)
+    original_file_path = Path(db_row['original_path'])
+    if not original_file_path.exists():
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Original media file for '{video_name}' not found at {original_file_path}.")
+
+    # Default transcoding options for this simple endpoint
+    # Output path will be based on slugified stem, consistent with get_media_files_from_db logic
+    slugified_stem = slugify_for_id(original_file_path.stem)
+    output_filename = f"{slugified_stem}.mp4" # Standardized name
+    output_path = TRANSCODED_DIR / output_filename
+    
+    # Use default options for simple transcoding endpoint
+    success = transcode_video(original_file_path, output_path) 
+
     if success:
-        return {"message": f"Successfully started transcoding for {video_name}. Output will be at {transcoded_path.name}"}
+        db_transcoded_path_str = str(output_path.relative_to(BASE_DIR)) if output_path.exists() else None
+        if db_transcoded_path_str:
+            try:
+                cursor.execute("UPDATE media_files SET transcoded_path = ?, has_transcoded_version = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ?", 
+                               (db_transcoded_path_str, video_name))
+                conn.commit()
+                logger.info(f"Database updated for transcoded video {video_name}.")
+                return {"message": f"Video {video_name} is being transcoded (or already exists). Refresh to see changes.", "output_path": db_transcoded_path_str}
+            except sqlite3.Error as e:
+                logger.error(f"DB update failed for transcoded video {video_name}: {e}")
+                # If DB update fails, the file is transcoded but not reflected. Decide on error handling.
+                conn.rollback()
+                raise HTTPException(status_code=500, detail="Transcoding initiated, but database update failed.")
+        else:
+            # This case should ideally not happen if transcode_video reported success and file exists
+            logger.error(f"Transcode reported success for {video_name} but output path {output_path} not found or not relative.")
+            raise HTTPException(status_code=500, detail="Transcoding finished but output file issue occurred.")
     else:
-        try:
-            subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True)
-        except FileNotFoundError:
-            raise HTTPException(status_code=500, detail="FFmpeg not found. Please install FFmpeg and ensure it is in your system PATH.")
-        except subprocess.CalledProcessError:
-            pass
-        raise HTTPException(status_code=500, detail=f"Failed to transcode {video_name}. Check server logs for FFmpeg errors.")
+        # transcode_video logs its own errors (ffmpeg not found, ffmpeg error)
+        raise HTTPException(status_code=500, detail=f"Failed to start transcoding for {video_name}. Check server logs for FFmpeg errors.")
+    conn.close()
 
 @app.post("/transcode-video-advanced/{video_name:path}")
 async def transcode_specific_video_advanced_endpoint(
@@ -425,58 +788,70 @@ async def transcode_specific_video_advanced_endpoint(
     preset: str = Form("medium"),
     profile: str = Form("high")
 ):
-    original_path = MEDIA_DIR / video_name
-    slugified_stem = slugify_for_id(original_path.stem)
-    
-    if not original_path.exists() or not original_path.is_file():
-        raise HTTPException(status_code=404, detail="Original video not found.")
-    if original_path.suffix.lower() not in ['.mp4', '.avi', '.mov', '.mkv']:
-        raise HTTPException(status_code=400, detail="File is not a supported video type for transcoding.")
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT original_path FROM media_files WHERE filename = ? AND media_type = 'video'", (video_name,))
+    db_row = cursor.fetchone()
+
+    if not db_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Video '{video_name}' not found in database.")
+
+    original_file_path = Path(db_row['original_path'])
+    if not original_file_path.exists():
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Original media file for '{video_name}' not found at {original_file_path}.")
+
+    # Output path: Use a consistent naming convention, perhaps including options if they vary significantly
+    # For simplicity, using a similar slugified approach as the basic transcode for now.
+    # Advanced transcodes might warrant more descriptive names or a separate directory structure if multiple versions are kept.
+    slugified_stem = slugify_for_id(original_file_path.stem)
+    # Consider adding options to filename if multiple advanced transcodes are stored, e.g.: {slugified_stem}_{resolution}_{crf}.mp4
+    # For now, assume one primary transcoded version per original.
+    output_filename = f"{slugified_stem}.mp4" 
+    output_path = TRANSCODED_DIR / output_filename
 
     options = {
         "resolution": resolution,
         "quality_mode": quality_mode,
-        "crf": int(crf) if quality_mode == "crf" else None,
-        "video_bitrate": video_bitrate if quality_mode == "bitrate" else None,
+        "crf": int(crf) if quality_mode == 'crf' else None,
+        "video_bitrate": video_bitrate if quality_mode == 'bitrate' else None,
         "audio_bitrate": audio_bitrate,
         "preset": preset,
         "profile": profile
     }
-    
-    quality_suffix = f"_{resolution}_{quality_mode}{crf if quality_mode == 'crf' else video_bitrate}"
-    transcoded_path = TRANSCODED_DIR / f"{slugified_stem}{quality_suffix}.mp4"
-    
-    logger.info(f"Attempting advanced transcode: {original_path} to {transcoded_path} with options: {options}")
-    
-    success = transcode_video(original_path, transcoded_path, options)
+    # Filter out None values for options not relevant to the chosen quality_mode
+    active_options = {k: v for k, v in options.items() if v is not None}
+
+    success = transcode_video(original_file_path, output_path, options=active_options)
+
     if success:
-        new_file_web_path = f"/media_content_transcoded/{transcoded_path.name}"
-        # Return JSON that HTMX can use, or set a custom header
-        # For HTMX swapping specific parts, a JSON response handled by client-side JS is often cleaner
-        # For this direct update, we can send back a partial HTML or set headers.
-        # Let's try returning an HTML response that also triggers a custom event with details.
-        
-        response_content = f"<div id=\"advanced-transcoding-status-message\" class=\"text-green-400 text-xs mt-2\">Advanced transcoding complete! Output: {transcoded_path.name}. Player will update.</div>"
-        response = HTMLResponse(content=response_content)
-        response.headers["HX-Trigger" ] = f"newTranscodeAvailable={{ \"newPath\": \"{new_file_web_path}\", \"fileName\": \"{transcoded_path.name}\" }}"
-        return response
+        db_transcoded_path_str = str(output_path.relative_to(BASE_DIR)) if output_path.exists() else None
+        if db_transcoded_path_str:
+            try:
+                cursor.execute("UPDATE media_files SET transcoded_path = ?, has_transcoded_version = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ?", 
+                               (db_transcoded_path_str, video_name))
+                conn.commit()
+                logger.info(f"Database updated for advanced transcoded video {video_name}.")
+                return {"message": f"Advanced transcoding for {video_name} initiated (or file already existed).", "output_path": db_transcoded_path_str, "options_used": active_options}
+            except sqlite3.Error as e:
+                logger.error(f"DB update failed for advanced transcoded video {video_name}: {e}")
+                conn.rollback()
+                raise HTTPException(status_code=500, detail="Advanced transcoding initiated, but database update failed.")
+        else:
+            logger.error(f"Advanced transcode for {video_name} reported success but output path {output_path} issue.")
+            raise HTTPException(status_code=500, detail="Advanced transcoding finished but output file issue occurred.")
     else:
-        # ... (error handling as before)
-        try:
-            subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True)
-        except FileNotFoundError:
-            raise HTTPException(status_code=500, detail="FFmpeg not found. Please install FFmpeg and ensure it is in your system PATH.")
-        except subprocess.CalledProcessError:
-            pass
-        raise HTTPException(status_code=500, detail=f"Failed to transcode {video_name}. Check server logs for FFmpeg errors.")
+        raise HTTPException(status_code=500, detail=f"Failed to start advanced transcoding for {video_name}. Check logs.")
+    conn.close()
 
 @app.post("/transcode-all-videos")
 async def transcode_all_videos_endpoint():
-    success_count, error_count, errors = await transcode_all_videos()
-    status_msg = f"Transcoding complete! {success_count} videos transcoded successfully"
-    if error_count > 0:
-        status_msg += f", {error_count} failed (see logs)"
-    return HTMLResponse(content=status_msg)
+    # This endpoint will use default transcoding options.
+    # The transcode_all_videos_with_options will allow specifying them.
+    # For simplicity, let's make this a wrapper or share logic.
+    # Calling the more general function with default options here.
+    return await transcode_all_videos_with_options_logic(options=None) # Pass None to use defaults in transcode_video
 
 @app.post("/transcode-all-videos-with-options")
 async def transcode_all_videos_with_options_endpoint(
@@ -486,137 +861,227 @@ async def transcode_all_videos_with_options_endpoint(
     video_bitrate: str = Form("2M"),
     audio_bitrate: str = Form("128k"),
     preset: str = Form("medium")
+    # profile is not in the form, will use default in transcode_video if not specified.
 ):
-    # Convert form parameters to options dictionary
     options = {
         "resolution": resolution,
         "quality_mode": quality_mode,
-        "crf": int(crf) if quality_mode == "crf" else None,
-        "video_bitrate": video_bitrate if quality_mode == "bitrate" else None,
+        "crf": int(crf) if quality_mode == 'crf' else None,
+        "video_bitrate": video_bitrate if quality_mode == 'bitrate' else None,
         "audio_bitrate": audio_bitrate,
-        "preset": preset
+        "preset": preset,
+        # "profile": "high" # Default in transcode_video
     }
-    
-    success_count, error_count, errors = await transcode_all_videos(options)
-    status_msg = f"Custom transcoding complete! {success_count} videos transcoded successfully"
-    if error_count > 0:
-        status_msg += f", {error_count} failed (see logs)"
-    return HTMLResponse(content=status_msg)
+    active_options = {k: v for k, v in options.items() if v is not None}
+    return await transcode_all_videos_with_options_logic(options=active_options)
 
-# Bulk transcoding helper function
-async def transcode_all_videos(options=None):
-    media_files = get_media_files()
-    video_files = [f for f in media_files if f["type"] == "video"]
-    
-    success_count = 0
-    error_count = 0
-    errors = []
-    
-    for video_info in video_files:
-        original_path = MEDIA_DIR / video_info["name"]
-        slugified_stem = slugify_for_id(original_path.stem)
+async def transcode_all_videos_with_options_logic(options: dict = None):
+    """Shared logic for bulk transcoding videos with specified or default options."""
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    # Get videos that do not have a transcoded version or where the path is null
+    cursor.execute("SELECT filename, original_path FROM media_files WHERE media_type = 'video' AND (has_transcoded_version = FALSE OR transcoded_path IS NULL)")
+    videos_to_process = cursor.fetchall()
+    # conn.close() # Keep open for updates in loop
 
-        # Determine output path:
-        # If bulk transcoding with options, it applies those options to the "default" slugified stem.
-        # If basic bulk transcoding, it uses default encoding options on the "default" slugified stem.
-        output_path_for_bulk = TRANSCODED_DIR / f"{slugified_stem}.mp4"
+    transcoded_count = 0
+    failed_count = 0
+    skipped_count = 0 # For files already existing that match criteria (handled by transcode_video)
 
-        # Check if this specific version (default slugified) already exists
-        # The video_info['has_transcoded_version'] from get_media_files (once updated) will reflect this.
-        # However, since get_media_files is called once at the start, its has_transcoded_version
-        # might be stale if a previous iteration of this loop just created the file.
-        # So, we check output_path_for_bulk.exists() directly.
-        if output_path_for_bulk.exists() and video_info['has_transcoded_version']: # video_info['has_transcoded_version'] for initial skip based on get_media_files
-             logger.info(f"Skipping already transcoded (default/bulk): {output_path_for_bulk}")
-             # success_count +=1 # Or a skipped_count
-             continue
-        if output_path_for_bulk.exists() and not options: # If basic bulk and file exists, definitely skip
-            logger.info(f"Skipping already transcoded (basic bulk): {output_path_for_bulk}")
+    if not videos_to_process:
+        conn.close()
+        return {"message": "No videos to transcode or all compatible videos are already transcoded.", "processed": 0, "failed": 0, "skipped":0}
+
+    logger.info(f"Starting bulk transcoding for {len(videos_to_process)} videos with options: {options or 'default'}")
+
+    for video_row in videos_to_process:
+        video_filename = video_row['filename']
+        original_file_path = Path(video_row['original_path'])
+
+        if not original_file_path.exists():
+            logger.warning(f"Original file for {video_filename} not found at {original_file_path}, skipping transcoding.")
+            failed_count += 1
             continue
-        # If it's bulk *with options*, we might want to re-transcode even if a STEM.mp4 exists,
-        # if those options are different. For simplicity now, if STEM.mp4 exists, bulk-with-options
-        # will overwrite it with the new options.
 
-        logger.info(f"Queueing for bulk transcode: {original_path} to {output_path_for_bulk} with options: {options if options else 'default'}")
+        slugified_stem = slugify_for_id(original_file_path.stem)
+        output_filename = f"{slugified_stem}.mp4"
+        output_path = TRANSCODED_DIR / output_filename
+
+        # transcode_video itself will skip if output_path exists. 
+        # We rely on this, but if it skips, we should count it as skipped, not failed.
+        # The transcode_video returns True if skipped or successfully transcoded.
         
-        success = transcode_video(original_path, output_path_for_bulk, options) # options are encoding settings
-        if success:
-            success_count += 1
-        else:
-            error_count += 1
-            errors.append(f"{video_info['name']}: transcoding failed")
-            logger.error(f"Failed to transcode {original_path} for bulk operation.")
-    
-    return success_count, error_count, errors
+        # Check if already exists before calling, to correctly update skipped_count
+        # This is slightly redundant with transcode_video internal check but helps classify.
+        if output_path.exists():
+            logger.info(f"Transcoded file {output_path} already exists, ensuring DB is up to date.")
+            # Ensure DB reflects this, might have been missed if server restarted during a previous bulk op
+            db_transcoded_path_str = str(output_path.relative_to(BASE_DIR))
+            try:
+                cursor.execute("UPDATE media_files SET transcoded_path = ?, has_transcoded_version = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ? AND (has_transcoded_version = FALSE OR transcoded_path IS NULL)", 
+                               (db_transcoded_path_str, video_filename))
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    logger.info(f"DB updated for pre-existing transcoded file: {video_filename}")
+                else:
+                    logger.info(f"DB already up-to-date for pre-existing transcoded file: {video_filename}")
+                skipped_count += 1
+                continue # Move to next file
+            except sqlite3.Error as e:
+                logger.error(f"DB update failed for pre-existing transcoded video {video_filename}: {e}")
+                conn.rollback()
+                failed_count +=1 # Count as fail if DB can't be updated
+                continue
 
-# --- NEW HOVER PREVIEW ENDPOINTS ---
+        logger.info(f"Starting transcode for: {video_filename} with options {options or 'default'}")
+        success = transcode_video(original_file_path, output_path, options=options) 
+
+        if success:
+            # File was either newly transcoded or already existed and was skipped by transcode_video
+            # The previous block handles explicit skips for already existing files for counting.
+            # If success is true here, it means a new transcode occurred.
+            db_transcoded_path_str = str(output_path.relative_to(BASE_DIR)) if output_path.exists() else None
+            if db_transcoded_path_str:
+                try:
+                    cursor.execute("UPDATE media_files SET transcoded_path = ?, has_transcoded_version = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ?", 
+                                   (db_transcoded_path_str, video_filename))
+                    conn.commit()
+                    logger.info(f"DB updated for newly transcoded video {video_filename}.")
+                    transcoded_count += 1
+                except sqlite3.Error as e:
+                    logger.error(f"DB update failed for newly transcoded video {video_filename}: {e}")
+                    conn.rollback()
+                    failed_count += 1 # Transcoded, but DB failed
+            else:
+                logger.error(f"Transcode of {video_filename} reported success, but output path {output_path} is problematic.")
+                failed_count += 1
+        else:
+            logger.error(f"Failed to transcode {video_filename}.")
+            failed_count += 1
+            
+    conn.close()
+    return {"message": f"Bulk video transcoding complete. Newly Transcoded: {transcoded_count}, Failed: {failed_count}, Skipped (already existed): {skipped_count}", "transcoded": transcoded_count, "failed": failed_count, "skipped": skipped_count}
+
+# Remove old async def transcode_all_videos(options=None): ...
+
 @app.post("/generate-preview/{video_name:path}")
 async def generate_specific_preview_endpoint(video_name: str, response: Response):
-    original_path = MEDIA_DIR / video_name
-    preview_path = get_preview_path(original_path)
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT original_path FROM media_files WHERE filename = ? AND media_type = 'video'", (video_name,))
+    db_row = cursor.fetchone()
 
-    if not original_path.exists() or not original_path.is_file():
-        raise HTTPException(status_code=404, detail="Original video not found.")
-    if original_path.suffix.lower() not in ['.mp4', '.avi', '.mov', '.mkv']:
-        raise HTTPException(status_code=400, detail="File is not a supported video type for preview generation.")
+    if not db_row:
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Video '{video_name}' not found in database.")
 
-    logger.info(f"Attempting to generate hover preview for: {original_path} to {preview_path}")
-    success = create_hover_preview(original_path, preview_path)
-    
+    original_file_path = Path(db_row['original_path'])
+    if not original_file_path.exists():
+        conn.close()
+        raise HTTPException(status_code=404, detail=f"Original media file for '{video_name}' not found at {original_file_path}.")
+
+    preview_p = get_preview_path(original_file_path) # This defines the standard preview path
+    success = create_hover_preview(original_file_path, preview_p)
+
     if success:
-        preview_url = f"/static/previews/{preview_path.name}"
-        response.headers["X-Preview-Url"] = preview_url
-        return {"message": f"Successfully generated hover preview for {video_name}. Output: {preview_path.name}", "preview_url": preview_url}
+        db_preview_path_str = str(preview_p.relative_to(BASE_DIR)) if preview_p.exists() else None
+        preview_url = f"/{db_preview_path_str.replace('\\', '/')}" if db_preview_path_str else None
+        if db_preview_path_str:
+            try:
+                cursor.execute("UPDATE media_files SET preview_path = ?, has_preview = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ?", 
+                               (db_preview_path_str, video_name))
+                conn.commit()
+                logger.info(f"Database updated for new preview of {video_name}.")
+                response.headers["X-Preview-Url"] = preview_url
+                return {"message": f"Hover preview generated for {video_name}", "preview_url": preview_url}
+            except sqlite3.Error as e:
+                logger.error(f"DB update failed for preview {video_name}: {e}")
+                conn.rollback()
+                raise HTTPException(status_code=500, detail="Preview generation completed, but database update failed.")
+        else:
+            logger.error(f"Preview generation for {video_name} reported success, but output path issue.")
+            raise HTTPException(status_code=500, detail="Preview generation finished but output file issue occurred.")
     else:
-        # FFmpeg error check similar to transcode endpoint
-        try:
-            subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True)
-        except FileNotFoundError:
-            raise HTTPException(status_code=500, detail="FFmpeg not found. Please install FFmpeg and ensure it is in your system PATH.")
-        except subprocess.CalledProcessError:
-            pass 
         raise HTTPException(status_code=500, detail=f"Failed to generate hover preview for {video_name}. Check server logs.")
+    conn.close()
 
 @app.post("/generate-all-previews")
 async def generate_all_previews_endpoint():
+    conn = get_db_connection()
+    cursor = conn.cursor()
+    cursor.execute("SELECT filename, original_path FROM media_files WHERE media_type = 'video' AND (has_preview = FALSE OR preview_path IS NULL)")
+    videos_to_process = cursor.fetchall()
+    # conn.close() # Keep open for updates
+
     generated_count = 0
     failed_count = 0
     skipped_count = 0
-    
-    video_extensions = ['.mp4', '.avi', '.mov', '.mkv']
-    all_video_files = [f for f in MEDIA_DIR.iterdir() if f.is_file() and f.suffix.lower() in video_extensions]
 
-    if not all_video_files:
-        return {"message": "No video files found to generate previews for.", "generated": 0, "failed": 0, "skipped": 0}
+    if not videos_to_process:
+        conn.close()
+        return {"message": "No video previews to generate. All videos either have previews or are not registered.", "generated": 0, "failed": 0, "skipped": 0}
 
-    for original_path in all_video_files:
-        preview_path = get_preview_path(original_path)
-        if preview_path.exists():
-            skipped_count += 1
+    logger.info(f"Starting bulk preview generation for {len(videos_to_process)} videos.")
+
+    for video_row in videos_to_process:
+        video_filename = video_row['filename']
+        original_file_path = Path(video_row['original_path'])
+        preview_output_path = get_preview_path(original_file_path)
+
+        if not original_file_path.exists():
+            logger.warning(f"Original file for {video_filename} not found at {original_file_path}, skipping preview generation.")
+            failed_count += 1
             continue
         
-        logger.info(f"Queueing hover preview generation for: {original_path} to {preview_path}")
-        if create_hover_preview(original_path, preview_path):
-            generated_count += 1
+        # Check if preview already exists to manage skipped_count
+        if preview_output_path.exists():
+            logger.info(f"Preview file {preview_output_path} already exists, ensuring DB is up to date.")
+            db_preview_path_str = str(preview_output_path.relative_to(BASE_DIR))
+            try:
+                cursor.execute("UPDATE media_files SET preview_path = ?, has_preview = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ? AND (has_preview = FALSE OR preview_path IS NULL)", 
+                               (db_preview_path_str, video_filename))
+                if cursor.rowcount > 0:
+                    conn.commit()
+                    logger.info(f"DB updated for pre-existing preview file: {video_filename}")
+                else:
+                     logger.info(f"DB already up-to-date for pre-existing preview file: {video_filename}")
+                skipped_count += 1
+                continue
+            except sqlite3.Error as e:
+                logger.error(f"DB update failed for pre-existing preview video {video_filename}: {e}")
+                conn.rollback()
+                failed_count +=1
+                continue
+
+        logger.info(f"Generating preview for: {video_filename}")
+        success = create_hover_preview(original_file_path, preview_output_path)
+        
+        if success:
+            db_preview_path_str = str(preview_output_path.relative_to(BASE_DIR)) if preview_output_path.exists() else None
+            if db_preview_path_str:
+                try:
+                    cursor.execute("UPDATE media_files SET preview_path = ?, has_preview = TRUE, last_scanned=CURRENT_TIMESTAMP WHERE filename = ?", 
+                                   (db_preview_path_str, video_filename))
+                    conn.commit()
+                    logger.info(f"DB updated for new preview of {video_filename}.")
+                    generated_count += 1
+                except sqlite3.Error as e:
+                    logger.error(f"DB update failed for new preview {video_filename}: {e}")
+                    conn.rollback()
+                    failed_count += 1
+            else:
+                logger.error(f"Preview generation for {video_filename} reported success, but output path issue.")
+                failed_count += 1
         else:
+            logger.error(f"Failed to generate preview for {video_filename}.")
             failed_count += 1
             
-    if failed_count == len(all_video_files) and failed_count > 0:
-        try:
-            subprocess.run(["ffmpeg", "-version"], check=True, capture_output=True)
-        except FileNotFoundError:
-            return {"message": "FFmpeg not found. All preview generations failed. Please install FFmpeg.", "generated": generated_count, "failed": failed_count, "skipped": skipped_count}
-        except subprocess.CalledProcessError:
-            pass
+    conn.close()
+    return {"message": f"Bulk preview generation complete. Generated: {generated_count}, Failed: {failed_count}, Skipped: {skipped_count}", "generated": generated_count, "failed": failed_count, "skipped": skipped_count}
 
-    return {
-        "message": f"Hover preview generation completed. Generated: {generated_count}, Failed: {failed_count}, Skipped: {skipped_count}.",
-        "generated": generated_count,
-        "failed": failed_count,
-        "skipped": skipped_count
-    } 
+# Remove old async def generate_all_previews():
+# ... (old implementation) ...
 
-# --- Configuration Endpoints ---
 @app.get("/settings", response_class=HTMLResponse)
 async def settings_page(request: Request):
     # Pass CWD for display purposes, and the default media subdir for JS fallback
@@ -628,33 +1093,117 @@ async def settings_page(request: Request):
 
 @app.get("/settings/config", response_class=JSONResponse)
 async def get_current_config():
-    # Return only the part of the config the user can change, or the whole thing if simple
-    return {"media_directory_name": app_config.get("media_directory_name", DEFAULT_MEDIA_SUBDIR)}
+    media_dir_name = get_setting("media_directory_name")
+    return {"media_directory_name": media_dir_name or "media"}
 
 @app.post("/settings/config")
 async def update_app_config(request: Request):
-    form_data = await request.form()
-    new_media_dir_name = form_data.get("media_directory_name")
+    try:
+        data = await request.json()
+        new_media_dir_name = data.get("media_directory_name")
+        
+        if not new_media_dir_name or not isinstance(new_media_dir_name, str) or '/' in new_media_dir_name or '\\' in new_media_dir_name:
+            raise HTTPException(status_code=400, detail="Invalid media directory name. Cannot be empty or contain path separators.")
 
-    if not new_media_dir_name or not isinstance(new_media_dir_name, str):
-        raise HTTPException(status_code=400, detail="Invalid media_directory_name provided.")
-    
-    # Basic validation: check if it's just a name and not an absolute path or trying path traversal
-    # This assumes the directory is a direct child of BASE_DIR for simplicity.
-    # More complex validation would be needed for arbitrary paths.
-    if Path(new_media_dir_name).is_absolute() or ".." in new_media_dir_name or "/" in new_media_dir_name or "\\" in new_media_dir_name:
-        logger.warning(f"Attempt to set potentially unsafe media directory: {new_media_dir_name}")
-        raise HTTPException(status_code=400, detail="Media directory name must be a simple name (no paths or slashes).")
+        current_media_dir = get_setting("media_directory_name")
+        
+        if current_media_dir != new_media_dir_name:
+            update_setting("media_directory_name", new_media_dir_name)
+            logger.info(f"Media directory name updated in database to: {new_media_dir_name}. Application restart is required for changes to take full effect for MEDIA_DIR.")
+            # Global MEDIA_DIR will only update on app restart.
+            # Consider if we want to update it live or force a restart message.
+            return {"message": f"Settings updated. Media directory changed to '{new_media_dir_name}'. Please restart the application for these changes to fully apply.", "requires_restart": True}
+        
+        return {"message": "Settings updated. No change in media directory name."}
+    except json.JSONDecodeError:
+        raise HTTPException(status_code=400, detail="Invalid JSON format.")
+    except Exception as e:
+        logger.error(f"Error updating config: {e}")
+        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")
 
-    current_config = load_config()
-    current_config["media_directory_name"] = new_media_dir_name.strip()
-    save_config(current_config)
+# Ensure the media directory (from DB or default) exists or can be created by user.
+# This check is now more relevant after MEDIA_DIR is determined.
+if not MEDIA_DIR.exists():
+    logger.warning(f"The configured media directory {MEDIA_DIR} does not exist. Please create it or configure the correct path in Settings.")
+    # Optionally, create it if it's the default and doesn't exist:
+    # if MEDIA_DIR_NAME == "media": # Or your default name
+    #     try:
+    #         MEDIA_DIR.mkdir(parents=True, exist_ok=True)
+    #         logger.info(f"Default media directory {MEDIA_DIR} created.")
+    #     except Exception as e:
+    #         logger.error(f"Could not create default media directory {MEDIA_DIR}: {e}")
+else:
+    # If MEDIA_DIR exists, run the scan
+    scan_media_directory_and_update_db()
+
+
+class VideoMetadataUpdate(BaseModel):
+    user_title: Optional[str] = None
+    tags: Optional[List[str]] = None
+
+@app.post("/video/{video_id_db}/metadata")
+async def update_video_metadata(video_id_db: int, 
+                                request: Request, 
+                                user_title: Optional[str] = Form(None),
+                                tags_str: Optional[str] = Form(None)): # Renamed from 'tags' to 'tags_str' to indicate it's a string
+    conn = get_db_connection()
+    cursor = conn.cursor()
+
+    cursor.execute("SELECT filename FROM media_files WHERE id = ? AND media_type = 'video'", (video_id_db,))
+    video_exists = cursor.fetchone()
+    if not video_exists:
+        conn.close()
+        raise HTTPException(status_code=404, detail="Video not found in database.")
+
+    fields_to_update = {}
+    if user_title is not None:
+        fields_to_update["user_title"] = user_title.strip() if user_title.strip() else None
     
-    # IMPORTANT: This does NOT change MEDIA_DIR for the currently running instance.
-    # The application must be restarted for the change to take full effect.
-    return HTMLResponse(content=f"""
-        <div id=\"config-status-message\" class=\"p-3 mb-4 text-sm rounded-lg bg-sky-500/20 text-sky-300\">
-            Configuration saved: Media directory set to '<strong>{new_media_dir_name}</strong>'.<br>
-            <strong>Please restart the application for this change to take full effect.</strong>
-        </div>
-    """) 
+    parsed_tags_list = []
+    if tags_str is not None: # Check if tags_str was provided in the form
+        # Parse the comma-separated string from Choices.js/form input
+        parsed_tags_list = sorted(list(set(tag.strip() for tag in tags_str.split(',') if tag.strip())))
+        fields_to_update["tags"] = json.dumps(parsed_tags_list)
+
+    if not fields_to_update:
+        conn.close()
+        # Fetch current details to re-render the sidebar even if no effective change, 
+        # as HTMX expects a response to swap.
+        # Alternatively, could return a 204 No Content and handle on client, but swapping is simpler.
+        current_video_details = get_single_video_details_from_db(video_exists['filename'])
+        if not current_video_details:
+             # This case should ideally not happen if video_exists was found
+             raise HTTPException(status_code=404, detail="Video details not found after attempted update.")
+        return templates.TemplateResponse("_video_metadata_sidebar.html", {"request": request, "video": current_video_details})
+
+    set_clause = ", ".join([f"{key} = ?" for key in fields_to_update.keys()])
+    params = list(fields_to_update.values())
+    params.append(video_id_db)
+
+    try:
+        cursor.execute(f"UPDATE media_files SET {set_clause}, last_scanned=CURRENT_TIMESTAMP WHERE id = ?", params)
+        conn.commit()
+        logger.info(f"Updated metadata for video ID {video_id_db}: {fields_to_update}")
+    except sqlite3.Error as e:
+        conn.rollback()
+        logger.error(f"Database error updating metadata for video ID {video_id_db}: {e}")
+        # Still try to return the sidebar with old data and an error message if possible
+        # For simplicity, raising HTTP error for now.
+        raise HTTPException(status_code=500, detail="Database error updating metadata.")
+    finally:
+        conn.close()
+    
+    updated_video_details = get_single_video_details_from_db(video_exists['filename']) # Fetch by original filename
+    if not updated_video_details:
+        # This case would be unusual if the update succeeded and video_exists was valid
+        raise HTTPException(status_code=404, detail="Video details not found after successful update.")
+
+    return templates.TemplateResponse("_video_metadata_sidebar.html", {"request": request, "video": updated_video_details})
+
+
+if __name__ == "__main__":
+    import uvicorn
+    logger.info(f"Starting server. Media directory: {MEDIA_DIR}")
+    # Ensure create_tables() is called before uvicorn.run if not at top level
+    # create_tables() # Already called at module level
+    uvicorn.run(app, host="0.0.0.0", port=8000) 

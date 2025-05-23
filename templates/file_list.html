@@ -1,16 +1,17 @@
-{% for file in files %}
+{% if media_files %}
+{% for file in media_files %}
 <div 
     class="media-card group relative bg-slate-800 border border-slate-700 rounded-lg shadow-lg overflow-hidden transition-all duration-200 ease-in-out hover:shadow-2xl hover:border-primary/70 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-slate-900"
     data-preview-url="{{ file.preview_url if file.type == 'video' and file.has_preview else '' }}"
     data-thumbnail-url="{{ file.thumbnail }}"
-    id="media-card-{{ loop.index }}"
+    id="media-card-{{ file.id_db }}_{{ loop.index }}"
 >
     <a href="{{ url_for('video_player_page', video_name=file.name) if file.type == 'video' else file.path }}" 
        class="block aspect-[16/9] bg-black media-thumbnail-container relative"
-       aria-label="View {{ file.name }}"
+       aria-label="View {{ file.display_title }}"
     >
         <img src="{{ file.thumbnail }}" 
-             alt="Thumbnail for {{ file.name }}" 
+             alt="Thumbnail for {{ file.display_title }}" 
              class="media-thumbnail-img w-full h-full object-contain transition-opacity duration-300 ease-in-out group-hover:opacity-75 {{ 'p-4' if 'generic' in file.thumbnail else '' }}"
              loading="lazy">
         
@@ -35,15 +36,47 @@
         {% endif %}
     </a>
     <div class="p-3 sm:p-4">
-        <h3 class="text-sm sm:text-base font-semibold text-slate-200 group-hover:text-primary transition-colors duration-150 truncate" title="{{ file.name }}">
+        <h3 class="text-sm sm:text-base font-semibold text-slate-200 group-hover:text-primary transition-colors duration-150 truncate" title="{{ file.display_title }}">
             <a href="{{ url_for('video_player_page', video_name=file.name) if file.type == 'video' else file.path }}" class="focus:outline-none">
-                {{ file.name }}
+                {{ file.display_title }}
             </a>
         </h3>
         <p class="text-xs text-slate-400 capitalize">{{ file.type }}</p>
+        {% if file.type == 'video' and file.tags %}
+            <div class="mt-1.5 flex flex-wrap gap-1">
+                {% for tag in file.tags[:3] %}
+                    <span class="tag-bubble text-xs bg-slate-700 text-slate-300 px-1.5 py-0.5 rounded-full">{{ tag }}</span>
+                {% endfor %}
+                {% if file.tags|length > 3 %}
+                    <span class="tag-bubble text-xs bg-slate-600 text-slate-400 px-1.5 py-0.5 rounded-full">+{{ file.tags|length - 3 }} more</span>
+                {% endif %}
+            </div>
+        {% endif %}
     </div>
 </div>
 {% endfor %}
+{% else %}
+<div class="col-span-full text-center py-12">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-16 h-16 mx-auto text-slate-500 mb-4">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m21 21-5.197-5.197m0 0A7.5 7.5 0 1 0 5.196 5.196a7.5 7.5 0 0 0 10.607 10.607Z" />
+        <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 15.75 18 18M8.25 8.25 6 6" />
+      </svg>
+    <h3 class="text-xl font-semibold text-slate-300">No media files found.</h3>
+    <p class="text-slate-400 mt-2">
+        The application is looking for media in: <br>
+        <code class="text-sm bg-slate-700 px-1 py-0.5 rounded">{{ MEDIA_DIR_NAME_FOR_TEMPLATE }}</code> (full path: <code class="text-sm bg-slate-700 px-1 py-0.5 rounded">{{ MEDIA_DIR_PATH_FOR_TEMPLATE }}</code>).
+    </p>
+    <p class="text-slate-400 mt-1">
+        Ensure this directory exists and contains supported media files (videos, images, audio).
+    </p>
+    {% if search_query %}
+        <p class="text-slate-500 mt-4">
+            You searched for: <strong class="text-slate-400">"{{ search_query }}"</strong>. Try a different search or clear it.
+        </p>
+    {% endif %}
+    <p class="text-slate-500 mt-4">If you just changed the media directory in settings, you may need to restart the application.</p>
+</div>
+{% endif %}
 
 <script>
 function setupVideoPreviews() {

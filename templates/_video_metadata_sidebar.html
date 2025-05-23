@@ -1,0 +1,174 @@
+<div class="lg:w-96 xl:w-[400px] lg:flex-shrink-0 bg-slate-800 p-5 rounded-lg shadow-xl" id="video-metadata-sidebar">
+                <div id="metadata-display-section">
+                    <div class="flex justify-between items-start">
+                        <h2 class="text-xl font-semibold mb-1 text-white overflow-hidden whitespace-nowrap text-ellipsis" title="{{ video.display_title }}">{{ video.display_title }}</h2>
+                        <button onclick="toggleEditMetadataMode(true)" id="edit-metadata-button" class="text-slate-400 hover:text-primary p-1">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
+                                <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
+                            </svg>
+                        </button>
+                    </div>
+                    <p class="text-xs text-slate-500 mb-2">Filename: {{ video.name }}</p>
+                    
+                    {% if video.tags %}
+                    <div class="mb-4" id="tags-display-area">
+                        <h3 class="text-sm font-medium text-slate-400 mb-1.5">Tags:</h3>
+                        <div class="flex flex-wrap gap-2">
+                            {% for tag in video.tags %}
+                            <span class="bg-slate-700 text-slate-300 text-xs px-2.5 py-1 rounded-full">{{ tag }}</span>
+                            {% endfor %}
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="mb-4" id="tags-display-area">
+                         <p class="text-sm text-slate-500 italic">No tags yet.</p>
+                    </div>
+                    {% endif %}
+                    <p class="text-xs text-slate-400 mb-4">System Details</p>
+                </div>
+
+                <!-- Metadata Edit Form (Initially Hidden) -->
+                <form id="metadata-edit-form" class="hidden space-y-4 mb-6"
+                      hx-post="{{ url_for('update_video_metadata', video_id_db=video.id_db) }}"
+                      hx-target="#video-metadata-sidebar" {# Target the whole sidebar for now to refresh display and form #}
+                      hx-swap="outerHTML" {# Replace the entire sidebar, which will re-render it in display mode #}
+                      hx-indicator="#metadata-save-spinner"
+                      hx-on::after-request="handleMetadataUpdateResponse(event)"
+                      >
+                    <div>
+                        <label for="user_title" class="block text-sm font-medium text-slate-300 mb-1">Custom Title</label>
+                        <input type="text" name="user_title" id="user_title" value="{{ video.user_title if video.user_title is not none else '' }}" placeholder="Enter custom title (optional)" 
+                               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <p class="text-xs text-slate-500 mt-1">Leave blank to use filename.</p>
+                    </div>
+                    <div>
+                        <label for="tags" class="block text-sm font-medium text-slate-300 mb-1">Tags</label>
+                        <input type="text" name="tags_str" id="tags-input" value="{{ video.tags|join(', ') if video.tags else '' }}" placeholder="Enter tags, comma-separated" 
+                               class="w-full choices-tags-input">
+                         <p class="text-xs text-slate-500 mt-1">Comma-separated list of tags.</p>
+                    </div>
+                    <div class="flex items-center gap-3">
+                        <button type="submit" class="bg-primary hover:bg-primary/90 text-white font-semibold py-2 px-4 rounded-lg focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-150 flex items-center">
+                            <span id="metadata-save-spinner" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                            Save Changes
+                        </button>
+                        <button type="button" onclick="toggleEditMetadataMode(false)" class="bg-slate-600 hover:bg-slate-500 text-slate-200 font-semibold py-2 px-4 rounded-lg transition-all duration-150">
+                            Cancel
+                        </button>
+                    </div>
+                    <div id="metadata-edit-message" class="text-xs mt-2"></div>
+                </form>
+
+                <div class="space-y-3 text-sm" id="system-details-section">
+                    <div class="flex justify-between">
+                        <span class="text-slate-400 font-medium">Duration:</span>
+                        <span class="text-slate-200">{{ video.duration }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400 font-medium">Resolution:</span>
+                        <span class="text-slate-200">{{ video.resolution }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400 font-medium">FPS:</span>
+                        <span class="text-slate-200">{{ video.fps }}</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400 font-medium">Size:</span>
+                        <span class="text-slate-200">{{ "%.2f" | format(video.size / (1024*1024)) }} MB</span>
+                    </div>
+                    <div class="flex justify-between">
+                        <span class="text-slate-400 font-medium">Path:</span>
+                        <span class="text-slate-200 overflow-hidden whitespace-nowrap text-ellipsis" title="{{ video.path }}">{{ video.path }}</span>
+                    </div>
+                </div>
+                
+                <div class="mt-8 space-y-4">
+                    <a href="{{ video.original_path_for_download }}" download class="w-full bg-primary text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2">
+                            <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                            <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                        </svg>
+                        Download Original ({{ (video.size / (1024*1024)) | round(2) }} MB)
+                    </a>
+
+                    {% if not video.has_specific_thumbnail %}
+                    <button 
+                        hx-post="{{ url_for('generate_specific_thumbnail_endpoint', video_name=video.name) }}"
+                        hx-indicator="#thumbnail-spinner-{{ video.name | slugify_for_id }}"
+                        hx-on::after-request="
+                            let player = document.getElementById('main-video-player');
+                            let newPosterUrl = event.detail.xhr.getResponseHeader('X-Thumbnail-Url');
+                            if (newPosterUrl) {
+                                player.poster = newPosterUrl;
+                                this.remove(); // Remove button after success
+                                let statusDiv = document.getElementById('thumbnail-status-message-{{ video.name | slugify_for_id }}');
+                                if(statusDiv) statusDiv.innerHTML = '<p class='text-green-400 text-xs mt-2'>Thumbnail generated and updated!</p>';
+                            } else {
+                                let statusDiv = document.getElementById('thumbnail-status-message-{{ video.name | slugify_for_id }}');
+                                if(statusDiv) statusDiv.innerHTML = '<p class='text-red-400 text-xs mt-2'>Failed to get thumbnail URL from response.</p>';
+                            }
+                        "
+                        class="w-full bg-amber-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                        <span id="thumbnail-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Generate Thumbnail
+                    </button>
+                    <div id="thumbnail-status-message-{{ video.name | slugify_for_id }}"></div>
+                    {% endif %}
+
+                    {% if video.type == 'video' and not video.has_transcoded_version %}
+                    <button 
+                        hx-post="{{ url_for('transcode_specific_video_endpoint', video_name=video.name) }}"
+                        hx-indicator="#transcode-spinner-{{ video.name | slugify_for_id }}"
+                        hx-on::after-request="
+                            this.innerText = 'Transcoding Started (refresh to play)'; 
+                            this.disabled = true;
+                            let statusDiv = document.getElementById('transcode-status-message-{{ video.name | slugify_for_id }}');
+                            if(statusDiv) statusDiv.innerHTML = '<p class='text-sky-400 text-xs mt-2'>Transcoding initiated. Refresh the page after a while to see if the transcoded version is available.</p>';
+                        "
+                        class="w-full bg-sky-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                        <span id="transcode-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Create Web-Optimized Version (MP4)
+                    </button>
+                    <div id="transcode-status-message-{{ video.name | slugify_for_id }}"></div>
+                    {% endif %}
+
+                    {% if video.type == 'video' and not video.has_preview %}
+                    <button 
+                        hx-post="{{ url_for('generate_specific_preview_endpoint', video_name=video.name) }}"
+                        hx-indicator="#preview-spinner-{{ video.name | slugify_for_id }}"
+                        hx-on::after-request="
+                            let newPreviewUrl = event.detail.xhr.getResponseHeader('X-Preview-Url');
+                            if (newPreviewUrl) {
+                                this.innerText = 'Preview Generated'; 
+                                this.disabled = true;
+                                let statusDiv = document.getElementById('preview-status-message-{{ video.name | slugify_for_id }}');
+                                if(statusDiv) statusDiv.innerHTML = '<p class='text-purple-400 text-xs mt-2'>Hover preview generated! It will be used in the media browser.</p>';
+                                // Optionally, update video.has_preview and video.preview_url if we were managing state here
+                            } else {
+                                this.innerText = 'Preview Generation Failed';
+                                let statusDiv = document.getElementById('preview-status-message-{{ video.name | slugify_for_id }}');
+                                if(statusDiv) statusDiv.innerHTML = '<p class='text-red-400 text-xs mt-2'>Failed to generate preview. Check logs.</p>';
+                            }
+                        "
+                        class="w-full bg-purple-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                        <span id="preview-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Generate Hover Preview (5s)
+                    </button>
+                    <div id="preview-status-message-{{ video.name | slugify_for_id }}"></div>
+                    {% endif %}
+
+                    <!-- Advanced Transcoding Button -->
+                    {% if video.type == 'video' %}
+                    <button 
+                        onclick="openAdvancedTranscodingModal()"
+                        class="w-full bg-indigo-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-indigo-500 focus:outline-none focus:ring-2 focus:ring-indigo-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 mr-2">
+                            <path fill-rule="evenodd" d="M11.828 2.25c-.916 0-1.699.663-1.85 1.567l-.091.549a.798.798 0 01-.517.608 7.45 7.45 0 00-.478.198.798.798 0 01-.796-.064l-.453-.324a1.875 1.875 0 00-2.416.2l-.243.243a1.875 1.875 0 00-.2 2.416l.324.453a.798.798 0 01.064.796 7.448 7.448 0 00-.198.478.798.798 0 01-.608.517l-.549.091A1.875 1.875 0 002.25 11.828v.344c0 .916.663 1.699 1.567 1.85l.549.091c.281.047.508.25.608.517.06.162.127.321.198.478a.798.798 0 01-.064.796l-.324.453a1.875 1.875 0 00.2 2.416l.243.243c.648.648 1.67.733 2.416.2l.453-.324a.798.798 0 01.796-.064c.157.071.316.137.478.198.267.1.47.327.517.608l.091.549a1.875 1.875 0 001.85 1.567h.344c.916 0 1.699-.663 1.85-1.567l.091-.549a.798.798 0 01.517-.608 7.52 7.52 0 00.478-.198.798.798 0 01.796.064l.453.324a1.875 1.875 0 002.416-.2l.243-.243c.648-.648.733-1.67.2-2.416l-.324-.453a.798.798 0 01-.064-.796c.071-.157.137-.316.198-.478.1-.267.327-.47.608-.517l.549-.091A1.875 1.875 0 0021.75 12.172v-.344c0-.916-.663-1.699-1.567-1.85l-.549-.091a.798.798 0 01-.608-.517 7.507 7.507 0 00-.198-.478.798.798 0 01.064-.796l.324-.453a1.875 1.875 0 00-.2-2.416l-.243-.243a1.875 1.875 0 00-2.416-.2l-.453.324a.798.798 0 01-.796.064 7.462 7.462 0 00-.478-.198.798.798 0 01-.517-.608l-.091-.549A1.875 1.875 0 0012.172 2.25h-.344zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" clip-rule="evenodd" />
+                        </svg>
+                        Advanced Transcoding Options
+                    </button>
+                    {% endif %}
+                </div>
+            </div>
+</div> 
