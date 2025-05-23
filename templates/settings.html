@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Application Settings - Media Browser</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a73e8',
+                        slate: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen font-sans">
+    <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <h1 class="text-xl lg:text-2xl font-semibold text-white">Application Settings</h1>
+                <a href="/" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors duration-150">
+                    &larr; Back to Media Browser
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-xl mx-auto p-4 sm:p-6 lg:p-8">
+        <div class="bg-slate-800 p-6 sm:p-8 rounded-xl shadow-xl border border-slate-700">
+            <h2 class="text-2xl font-semibold text-slate-100 mb-6">Media Library Configuration</h2>
+            
+            <div id="config-status-message" class="mb-4"></div>
+
+            <form 
+                hx-post="/settings/config" 
+                hx-target="#config-status-message" 
+                hx-swap="innerHTML"
+                hx-indicator="#config-loading-spinner"
+                class="space-y-6"
+                hx-on::after-request="this.reset(); fetchCurrentConfig();"
+            >
+                <div>
+                    <label for="media_directory_name_input" class="block text-sm font-medium text-slate-300 mb-2">Media Directory Name</label>
+                    <input type="text" name="media_directory_name" id="media_directory_name_input"
+                           class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                           placeholder="e.g., my_videos">
+                    <p class="mt-2 text-xs text-slate-400">
+                        Enter the name of the directory within the application folder to use as your media library (e.g., 'videos', 'media_collection').
+                        This directory must be located directly inside the application's main folder: <code class="text-xs bg-slate-700 p-1 rounded">{{ CWD_DISPLAY_PATH }}</code>.
+                        Special characters and paths (slashes) are not allowed.
+                    </p>
+                </div>
+
+                <button type="submit" 
+                        class="w-full bg-primary text-white font-semibold py-3 px-6 rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-base">
+                    <span id="config-loading-spinner" class="htmx-indicator animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-3"></span>
+                    Save Configuration
+                </button>
+            </form>
+            
+            <div class="mt-8 p-4 bg-slate-700/50 rounded-md">
+                <h3 class="text-sm font-medium text-slate-300 mb-1">Current Configuration:</h3>
+                <p class="text-xs text-slate-400">Media Directory: <code id="current-media-dir-display" class="font-mono">Loading...</code></p>
+                <p class="mt-3 text-xs text-amber-400/80">
+                    <strong>Important:</strong> After saving, you must restart the application for changes to the media directory to take full effect.
+                </p>
+            </div>
+        </div>
+    </main>
+
+    <script>
+        function fetchCurrentConfig() {
+            fetch('/settings/config')
+                .then(response => response.json())
+                .then(data => {
+                    const mediaDirName = data.media_directory_name || '{{ DEFAULT_MEDIA_SUBDIR_JS }}'; // Use JS default if needed
+                    document.getElementById('media_directory_name_input').value = mediaDirName;
+                    document.getElementById('current-media-dir-display').textContent = mediaDirName;
+                })
+                .catch(error => {
+                    console.error('Error fetching current config:', error);
+                    document.getElementById('current-media-dir-display').textContent = 'Error loading config';
+                });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            fetchCurrentConfig();
+
+            // The form's after-request will also call fetchCurrentConfig 
+            // to ensure the input field is correctly populated if the server response for submission
+            // doesn't include an HX-Trigger to update it, or if we want to ensure it reflects the true saved state.
+            // However, a simpler approach might be needed if the response doesn't provide the X-Current-Media-Dir header reliably.
+            // For now, the hx-on::after-request on the form tries to update based on a header and then re-fetches.
+        });
+    </script>
+</body>
+</html> 

@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Media Processing Tools - Media Browser</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a73e8',
+                        slate: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen font-sans">
+    <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <h1 class="text-xl lg:text-2xl font-semibold text-white">Media Processing Tools</h1>
+                <a href="/" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors duration-150">
+                    &larr; Back to Media Browser
+                </a>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+        <!-- Thumbnail Generation Section -->
+        <div class="bg-slate-800 p-6 sm:p-8 rounded-xl shadow-xl border border-slate-700">
+            <div class="flex items-center mb-6">
+                <div class="p-3 bg-primary/20 rounded-full mr-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-primary">
+                        <path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h16.5A2.25 2.25 0 0122.5 6v12a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 18V6zM3 16.06V18c0 .414.336.75.75.75h16.5A.75.75 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-semibold text-slate-100">Video Thumbnails</h2>
+            </div>
+            <p class="text-slate-400 mb-6 text-sm leading-relaxed">
+                Generate missing thumbnails for all video files. Existing thumbnails will be skipped.
+            </p>
+            <button 
+                hx-post="/generate-all-video-thumbnails"
+                hx-target="#thumbnail-status-message"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-spinner-thumbnails"
+                class="w-full bg-primary/80 text-white font-semibold py-3 px-6 rounded-lg hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-base">
+                <span id="loading-spinner-thumbnails" class="htmx-indicator animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-3"></span>
+                Generate Missing Thumbnails
+            </button>
+            <div class="mt-6 p-4 bg-slate-700/50 rounded-md min-h-[50px]">
+                <p id="thumbnail-status-message" class="text-sm text-slate-300"></p>
+            </div>
+        </div>
+
+        <!-- Video Transcoding Section -->
+        <div class="bg-slate-800 p-6 sm:p-8 rounded-xl shadow-xl border border-slate-700">
+            <div class="flex items-center mb-6">
+                <div class="p-3 bg-sky-500/20 rounded-full mr-4">
+                     <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-sky-400">
+                        <path d="M4.5 4.5a3 3 0 00-3 3v9a3 3 0 003 3h15a3 3 0 003-3v-9a3 3 0 00-3-3h-15zm11.25 9.75l-3.75-2.25v4.5l3.75-2.25z" />
+                        <path fill-rule="evenodd" d="M1.5 7.5a3 3 0 013-3h15a3 3 0 013 3v9a3 3 0 01-3 3h-15a3 3 0 01-3-3v-9zm3 .75a1.5 1.5 0 011.5-1.5h10.5a1.5 1.5 0 011.5 1.5v2.443c.572.235 1.072.559 1.5.942V7.5a3 3 0 00-3-3h-10.5a3 3 0 00-3 3v9a3 3 0 003 3h10.5a3 3 0 003-3v-.693c-.428.383-.928.707-1.5.942V16.5a1.5 1.5 0 01-1.5 1.5h-10.5a1.5 1.5 0 01-1.5-1.5v-8.25z" clip-rule="evenodd" />
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-semibold text-slate-100">Video Transcoding</h2>
+            </div>
+            <p class="text-slate-400 mb-6 text-sm leading-relaxed">
+                Transcode all videos to web-friendly H.264 MP4 format with customizable quality settings. This is CPU intensive and can take significant time. Existing transcoded files will be skipped.
+            </p>
+            
+            <!-- Transcoding Options Form -->
+            <form hx-post="/transcode-all-videos-with-options" hx-target="#transcoding-status-message" hx-swap="innerHTML" hx-indicator="#loading-spinner-transcoding">
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
+                    <div>
+                        <label for="resolution" class="block text-sm font-medium text-slate-300 mb-2">Resolution</label>
+                        <select name="resolution" id="resolution" 
+                                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                            <option value="original">Original Resolution</option>
+                            <option value="1080p">1080p (Full HD)</option>
+                            <option value="720p" selected>720p (HD)</option>
+                            <option value="480p">480p (SD)</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="quality_mode" class="block text-sm font-medium text-slate-300 mb-2">Quality Mode</label>
+                        <select name="quality_mode" id="quality_mode" onchange="toggleQualityOptions()"
+                                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                            <option value="crf" selected>CRF (Constant Quality)</option>
+                            <option value="bitrate">Bitrate (Constant Rate)</option>
+                        </select>
+                    </div>
+                    
+                    <div id="crf-container">
+                        <label for="crf" class="block text-sm font-medium text-slate-300 mb-2">CRF Quality (Lower = Better)</label>
+                        <select name="crf" id="crf"
+                                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                            <option value="18">18 (Very High Quality)</option>
+                            <option value="23" selected>23 (High Quality)</option>
+                            <option value="28">28 (Medium Quality)</option>
+                            <option value="32">32 (Lower Quality)</option>
+                        </select>
+                    </div>
+                    
+                    <div id="bitrate-container" style="display: none;">
+                        <label for="video_bitrate" class="block text-sm font-medium text-slate-300 mb-2">Video Bitrate</label>
+                        <select name="video_bitrate" id="video_bitrate"
+                                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                            <option value="1M">1 Mbps</option>
+                            <option value="2M" selected>2 Mbps</option>
+                            <option value="4M">4 Mbps</option>
+                            <option value="8M">8 Mbps</option>
+                            <option value="12M">12 Mbps</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="audio_bitrate" class="block text-sm font-medium text-slate-300 mb-2">Audio Bitrate</label>
+                        <select name="audio_bitrate" id="audio_bitrate"
+                                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                            <option value="96k">96 kbps</option>
+                            <option value="128k" selected>128 kbps</option>
+                            <option value="192k">192 kbps</option>
+                            <option value="256k">256 kbps</option>
+                        </select>
+                    </div>
+                    
+                    <div>
+                        <label for="preset" class="block text-sm font-medium text-slate-300 mb-2">Encoding Speed</label>
+                        <select name="preset" id="preset"
+                                class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-sky-500 focus:border-sky-500">
+                            <option value="ultrafast">Ultra Fast (Larger Files)</option>
+                            <option value="fast">Fast</option>
+                            <option value="medium" selected>Medium (Balanced)</option>
+                            <option value="slow">Slow (Better Compression)</option>
+                        </select>
+                    </div>
+                </div>
+                
+                <button type="submit" 
+                        class="w-full bg-sky-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-base">
+                    <span id="loading-spinner-transcoding" class="htmx-indicator animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-3"></span>
+                    Transcode All Videos
+                </button>
+            </form>
+            
+            <div class="mt-6 p-4 bg-slate-700/50 rounded-md min-h-[50px]">
+                <p id="transcoding-status-message" class="text-sm text-slate-300"></p>
+            </div>
+        </div>
+
+        <!-- Hover Previews Generation Section -->
+        <div class="bg-slate-800 p-6 sm:p-8 rounded-xl shadow-xl border border-slate-700">
+            <div class="flex items-center mb-6">
+                <div class="p-3 bg-purple-500/20 rounded-full mr-4">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 text-purple-400">
+                        <path fill-rule="evenodd" d="M3.75 4.5a.75.75 0 01.75-.75h15a.75.75 0 01.75.75v15a.75.75 0 01-.75.75h-15a.75.75 0 01-.75-.75V4.5zm0-1.5a2.25 2.25 0 00-2.25 2.25v15a2.25 2.25 0 002.25 2.25h15a2.25 2.25 0 002.25-2.25V4.5a2.25 2.25 0 00-2.25-2.25h-15z" clip-rule="evenodd" />
+                        <path d="M9 9.75a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5zm3.75-.75a.75.75 0 01.75.75v4.5a.75.75 0 01-1.5 0v-4.5a.75.75 0 01.75-.75zm2.25 0a.75.75 0 00-1.5 0v4.5a.75.75 0 001.5 0v-4.5z" />
+                    </svg>
+                </div>
+                <h2 class="text-2xl font-semibold text-slate-100">Video Hover Previews</h2>
+            </div>
+            <p class="text-slate-400 mb-6 text-sm leading-relaxed">
+                Generate short, muted, looping video previews (approx. 5 seconds) that can play on hover in the media browser. This is also CPU intensive. Existing previews will be skipped.
+            </p>
+            <button 
+                hx-post="/generate-all-previews"
+                hx-target="#preview-status-message"
+                hx-swap="innerHTML"
+                hx-indicator="#loading-spinner-previews"
+                class="w-full bg-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-base">
+                <span id="loading-spinner-previews" class="htmx-indicator animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-3"></span>
+                Generate All Hover Previews
+            </button>
+            <div class="mt-6 p-4 bg-slate-700/50 rounded-md min-h-[50px]">
+                <p id="preview-status-message" class="text-sm text-slate-300"></p>
+            </div>
+        </div>
+        
+        <!-- Note about FFmpeg -->
+        <div class="text-center text-xs text-slate-500 mt-8">
+            <p><strong>Note:</strong> Thumbnail generation, transcoding, and preview generation require FFmpeg to be installed and accessible in your system's PATH.</p>
+        </div>
+    </main>
+
+    <script>
+        function toggleQualityOptions() {
+            const qualityMode = document.getElementById('quality_mode').value;
+            const crfContainer = document.getElementById('crf-container');
+            const bitrateContainer = document.getElementById('bitrate-container');
+            
+            if (qualityMode === 'crf') {
+                crfContainer.style.display = 'block';
+                bitrateContainer.style.display = 'none';
+            } else {
+                crfContainer.style.display = 'none';
+                bitrateContainer.style.display = 'block';
+            }
+        }
+    </script>
+</body>
+</html> 

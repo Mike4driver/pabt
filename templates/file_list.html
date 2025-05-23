@@ -1,0 +1,102 @@
+{% for file in files %}
+<div 
+    class="media-card group relative bg-slate-800 border border-slate-700 rounded-lg shadow-lg overflow-hidden transition-all duration-200 ease-in-out hover:shadow-2xl hover:border-primary/70 focus-within:ring-2 focus-within:ring-primary focus-within:ring-offset-2 focus-within:ring-offset-slate-900"
+    data-preview-url="{{ file.preview_url if file.type == 'video' and file.has_preview else '' }}"
+    data-thumbnail-url="{{ file.thumbnail }}"
+    id="media-card-{{ loop.index }}"
+>
+    <a href="{{ url_for('video_player_page', video_name=file.name) if file.type == 'video' else file.path }}" 
+       class="block aspect-[16/9] bg-black media-thumbnail-container relative"
+       aria-label="View {{ file.name }}"
+    >
+        <img src="{{ file.thumbnail }}" 
+             alt="Thumbnail for {{ file.name }}" 
+             class="media-thumbnail-img w-full h-full object-contain transition-opacity duration-300 ease-in-out group-hover:opacity-75 {{ 'p-4' if 'generic' in file.thumbnail else '' }}"
+             loading="lazy">
+        
+        {# Placeholder for the preview video, will be populated by JS #}
+        <div class="preview-video-container absolute inset-0 w-full h-full"></div>
+
+        {% if file.duration %}
+        <span class="absolute bottom-2 right-2 bg-black/70 text-white text-xs px-1.5 py-0.5 rounded-sm">{{ file.duration }}</span>
+        {% endif %}
+        
+        {% if file.type == 'video' and file.has_transcoded_version %}
+        <span class="absolute top-2 left-2 bg-green-500/80 text-white text-xs px-1.5 py-0.5 rounded-sm font-medium">Transcoded</span>
+        {% endif %}
+        
+        {% if file.type == 'audio' %}
+            <div class="absolute inset-0 flex items-center justify-center">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16 text-slate-500 opacity-50">
+                    <path fill-rule="evenodd" d="M19.952 1.651a.75.75 0 01.298.599V16.5a3 3 0 01-5.223 2.502l-10.706-8.25a.75.75 0 010-1.004L14.729 1.5H4.5a.75.75 0 00-.75.75v10.5a.75.75 0 001.5 0v-10h9.479l-3.082 2.392a.75.75 0 00-.012 1.011L15 12.182v-3.475a2.25 2.25 0 011.084-1.993l3.75-2.25a.75.75 0 01.118-.063zM5.25 12a.75.75 0 01.75-.75H9a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75H6a.75.75 0 01-.75-.75v-1.5z" clip-rule="evenodd" />
+                    <path d="M15.75 15a.75.75 0 01.75-.75H18a.75.75 0 01.75.75v1.5a.75.75 0 01-.75.75h-1.5a.75.75 0 01-.75-.75v-1.5z" />
+                </svg>
+            </div>
+        {% endif %}
+    </a>
+    <div class="p-3 sm:p-4">
+        <h3 class="text-sm sm:text-base font-semibold text-slate-200 group-hover:text-primary transition-colors duration-150 truncate" title="{{ file.name }}">
+            <a href="{{ url_for('video_player_page', video_name=file.name) if file.type == 'video' else file.path }}" class="focus:outline-none">
+                {{ file.name }}
+            </a>
+        </h3>
+        <p class="text-xs text-slate-400 capitalize">{{ file.type }}</p>
+    </div>
+</div>
+{% endfor %}
+
+<script>
+function setupVideoPreviews() {
+    const mediaCards = document.querySelectorAll('.media-card');
+
+    mediaCards.forEach(card => {
+        const previewUrl = card.dataset.previewUrl;
+        const thumbnailImg = card.querySelector('.media-thumbnail-img');
+        const previewContainer = card.querySelector('.preview-video-container');
+
+        if (!previewUrl || !thumbnailImg || !previewContainer) {
+            return; // No preview for this card, or elements missing
+        }
+
+        // Create video player once and preload metadata
+        const videoPlayer = document.createElement('video');
+        videoPlayer.src = previewUrl;
+        videoPlayer.preload = 'metadata'; // Preload metadata
+        videoPlayer.loop = true;
+        videoPlayer.muted = true;
+        videoPlayer.playsInline = true;
+        videoPlayer.className = 'absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out opacity-0'; // Start hidden
+        previewContainer.appendChild(videoPlayer);
+        videoPlayer.load(); // Explicitly tell the browser to load metadata/initial data
+
+        card.addEventListener('mouseenter', () => {
+            // No timeout, attempt to play immediately
+            if (thumbnailImg) thumbnailImg.style.opacity = '0'; // Hide thumbnail
+            videoPlayer.style.opacity = '1'; // Show video
+            videoPlayer.play().catch(error => {
+                // It's common for play() to be interrupted if the user mouses out quickly
+                // or if the video isn't ready. We can choose to log only more critical errors.
+                if (error.name !== 'AbortError') {
+                    console.error("Error playing preview:", previewUrl, error);
+                }
+            });
+        });
+
+        card.addEventListener('mouseleave', () => {
+            videoPlayer.style.opacity = '0'; // Hide video
+            videoPlayer.pause();
+            if (thumbnailImg) thumbnailImg.style.opacity = '1'; // Restore thumbnail
+        });
+    });
+}
+
+// Initial setup
+document.addEventListener('DOMContentLoaded', setupVideoPreviews);
+
+// Re-run setup if HTMX swaps content (e.g., after search)
+document.body.addEventListener('htmx:afterSwap', function(event) {
+    if (event.detail.target.id === 'media-grid' || event.detail.target.closest('#media-grid')) {
+        setupVideoPreviews();
+    }
+});
+</script> 
