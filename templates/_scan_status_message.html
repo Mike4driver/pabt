@@ -1,0 +1,40 @@
+<div id="scan-status-container" class="mt-4 p-4 rounded-lg bg-slate-700 border border-slate-600 shadow-md">
+    <p class="text-sm text-slate-200">{{ message }}</p>
+    {% if job_id %}
+    <p class="text-xs text-slate-400 mt-1">Job ID: <span class="font-mono">{{ job_id }}</span></p>
+    <div id="scan-job-{{ job_id }}" 
+         class="mt-2 p-3 bg-slate-600/50 rounded-md text-xs"
+         hx-get="{{ job_status_url }}"
+         hx-trigger="every 2s until event.detail.status === 'completed' or event.detail.status === 'failed' from:body"
+         hx-swap="innerHTML">
+        <div hx-get="{{ job_status_url }}" hx-trigger="load" hx-swap="innerHTML">
+            Loading job status...
+            <div class="mt-1 w-full bg-slate-500 rounded-full h-1.5">
+                <div class="bg-primary h-1.5 rounded-full animate-pulse" style="width: 25%"></div>
+            </div>
+        </div>
+    </div>
+    <script>
+        // Custom event listener to stop polling when job is done
+        document.body.addEventListener('htmx:afterOnLoad', function(event) {
+            if (event.target.id === "scan-job-{{ job_id }}") {
+                try {
+                    const response = JSON.parse(event.detail.xhr.responseText);
+                    if (response.status === 'completed' || response.status === 'failed') {
+                        const newEvent = new CustomEvent('jobTerminated', { detail: { status: response.status } });
+                        document.body.dispatchEvent(newEvent);
+                        // Optionally, update the UI here directly or let HTMX handle it via another trigger
+                        let finalMessage = `<p class="text-sm">Job ${response.status}: ${response.result ? response.result.message : (response.error || 'No details')}</p>`;
+                        if (response.status === 'completed') {
+                            finalMessage += `<p class="text-xs text-green-400 mt-1">Scan complete. You might need to refresh the main media browser to see changes.</p>`;
+                        }
+                        event.target.innerHTML = finalMessage;
+                    }
+                } catch (e) {
+                    console.error("Error parsing job status JSON:", e);
+                }
+            }
+        });
+    </script>
+    {% endif %}
+</div> 

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Application Settings - Media Browser</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -34,10 +35,34 @@
     <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
-                <h1 class="text-xl lg:text-2xl font-semibold text-white">Application Settings</h1>
-                <a href="/" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors duration-150">
-                    &larr; Back to Media Browser
-                </a>
+                <a href="/" class="text-xl lg:text-2xl font-semibold text-white hover:text-primary transition-colors duration-150">Media Browser</a>
+                <div class="flex items-center space-x-4">
+                    <!-- Tools Dropdown -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" @click.away="open = false" class="flex items-center text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700">
+                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1">
+                                <path fill-rule="evenodd" d="M2.843 3.913A.75.75 0 0 0 2.25 4.5v11a.75.75 0 0 0 .593.737l3.521.88a.75.75 0 0 0 .874-.468l1.408-3.755a.75.75 0 0 1 1.428-.001l1.407 3.755a.75.75 0 0 0 .875.468l3.52-.88a.75.75 0 0 0 .594-.737V4.5a.75.75 0 0 0-.594-.737l-3.52-.88a.75.75 0 0 0-.875.468L11.16 6.105a.75.75 0 0 1-1.428.001L8.325 2.355a.75.75 0 0 0-.874-.468l-3.521.88.002-.001ZM4.463 4.58L7.5 3.75v3.479l-2.514.63a.75.75 0 0 0-.522.715v4.065L4.463 15.42V4.58Zm11.074 10.84L12.5 16.25V8.802l2.515-.63a.75.75 0 0 0 .52-.715V4.58l3.038.761v10.84Z" clip-rule="evenodd" />
+                            </svg>
+                            Tools
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1 opacity-70">
+                                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        <div x-show="open" x-transition 
+                             class="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-md shadow-lg py-1 z-20">
+                            <a href="{{ url_for('thumbnail_tools_page') }}" 
+                               class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-primary">Media Processing Tools</a>
+                            <a href="{{ url_for('background_jobs_page') }}" 
+                               class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-primary">Background Jobs</a>
+                        </div>
+                    </div>
+                     <button onclick="goBack()" class="flex items-center text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1">
+                            <path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.56l2.72 2.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 1.06L5.56 9.25H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd" />
+                        </svg>
+                        Go Back
+                    </button>
+                </div>
             </div>
         </div>
     </header>
@@ -54,8 +79,7 @@
                 hx-swap="innerHTML"
                 hx-indicator="#config-loading-spinner"
                 class="space-y-6"
-                hx-on::after-request="this.reset(); fetchCurrentConfig();"
-            >
+                hx-on:htmx:after-request="fetchCurrentConfig();">
                 <div>
                     <label for="media_directory_name_input" class="block text-sm font-medium text-slate-300 mb-2">Media Directory Name</label>
                     <input type="text" name="media_directory_name" id="media_directory_name_input"
@@ -81,6 +105,54 @@
                     </p>
                 </div>
 
+                <div>
+                    <label for="autoplay_enabled_input" class="block text-sm font-medium text-slate-300 mb-2">Video Autoplay</label>
+                    <select name="autoplay_enabled" id="autoplay_enabled_input"
+                            class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="true">Enabled (Videos start playing automatically)</option>
+                        <option value="false">Disabled (Show play button)</option>
+                    </select>
+                    <p class="mt-2 text-xs text-slate-400">
+                        When enabled, videos will automatically start playing when you visit the video player page. Most browsers require videos to be muted for autoplay to work.
+                    </p>
+                </div>
+
+                <div>
+                    <label for="default_muted_input" class="block text-sm font-medium text-slate-300 mb-2">Default Mute State</label>
+                    <select name="default_muted" id="default_muted_input"
+                            class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="true">Muted (Videos start without sound)</option>
+                        <option value="false">Unmuted (Videos start with sound)</option>
+                    </select>
+                    <p class="mt-2 text-xs text-slate-400">
+                        When muted, videos will start without sound and show an unmute button. When unmuted, videos will start with sound (but autoplay may not work in some browsers).
+                    </p>
+                </div>
+
+                <div>
+                    <label for="autoplay_next_input" class="block text-sm font-medium text-slate-300 mb-2">Autoplay Next Video</label>
+                    <select name="autoplay_next" id="autoplay_next_input"
+                            class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="true">Enabled (Auto-start next video when current ends)</option>
+                        <option value="false">Disabled (Show play button for next video)</option>
+                    </select>
+                    <p class="mt-2 text-xs text-slate-400">
+                        When enabled, the next video in the queue will automatically start playing when the current video ends. This creates a continuous viewing experience.
+                    </p>
+                </div>
+
+                <div>
+                    <label for="auto_replay_input" class="block text-sm font-medium text-slate-300 mb-2">Auto Replay Video</label>
+                    <select name="auto_replay" id="auto_replay_input"
+                            class="w-full px-4 py-2.5 bg-slate-700 border border-slate-600 rounded-lg text-slate-100 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="true">Enabled (Replay current video when it ends)</option>
+                        <option value="false">Disabled (Stop video when it ends)</option>
+                    </select>
+                    <p class="mt-2 text-xs text-slate-400">
+                        When enabled, the current video will automatically restart from the beginning when it reaches the end. Takes priority over autoplay next.
+                    </p>
+                </div>
+
                 <button type="submit" 
                         class="w-full bg-primary text-white font-semibold py-3 px-6 rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-base">
                     <span id="config-loading-spinner" class="htmx-indicator animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-3"></span>
@@ -92,6 +164,10 @@
                 <h3 class="text-sm font-medium text-slate-300 mb-1">Current Configuration:</h3>
                 <p class="text-xs text-slate-400">Media Directory: <code id="current-media-dir-display" class="font-mono">Loading...</code></p>
                 <p class="text-xs text-slate-400">Grid Size: <code id="current-grid-size-display" class="font-mono">Loading...</code></p>
+                <p class="text-xs text-slate-400">Video Autoplay: <code id="current-autoplay-display" class="font-mono">Loading...</code></p>
+                <p class="text-xs text-slate-400">Default Mute: <code id="current-muted-display" class="font-mono">Loading...</code></p>
+                <p class="text-xs text-slate-400">Autoplay Next: <code id="current-autoplay-next-display" class="font-mono">Loading...</code></p>
+                <p class="text-xs text-slate-400">Auto Replay: <code id="current-auto-replay-display" class="font-mono">Loading...</code></p>
                 <p class="mt-3 text-xs text-amber-400/80">
                     <strong>Important:</strong> After saving, you must restart the application for changes to the media directory to take full effect.
                 </p>
@@ -106,17 +182,37 @@
                 .then(data => {
                     const mediaDirName = data.media_directory_name || '{{ DEFAULT_MEDIA_SUBDIR_JS }}'; // Use JS default if needed
                     const gridSize = data.media_grid_size || 'medium';
+                    const autoplayEnabled = data.autoplay_enabled || 'true';
+                    const defaultMuted = data.default_muted || 'true';
+                    const autoplayNext = data.autoplay_next || 'false';
+                    const autoReplay = data.auto_replay || 'false';
                     
                     document.getElementById('media_directory_name_input').value = mediaDirName;
                     document.getElementById('current-media-dir-display').textContent = mediaDirName;
                     
                     document.getElementById('media_grid_size_input').value = gridSize;
                     document.getElementById('current-grid-size-display').textContent = gridSize;
+
+                    document.getElementById('autoplay_enabled_input').value = autoplayEnabled;
+                    document.getElementById('current-autoplay-display').textContent = autoplayEnabled === 'true' ? 'Enabled' : 'Disabled';
+
+                    document.getElementById('default_muted_input').value = defaultMuted;
+                    document.getElementById('current-muted-display').textContent = defaultMuted === 'true' ? 'Muted' : 'Unmuted';
+
+                    document.getElementById('autoplay_next_input').value = autoplayNext;
+                    document.getElementById('current-autoplay-next-display').textContent = autoplayNext === 'true' ? 'Enabled' : 'Disabled';
+
+                    document.getElementById('auto_replay_input').value = autoReplay;
+                    document.getElementById('current-auto-replay-display').textContent = autoReplay === 'true' ? 'Enabled' : 'Disabled';
                 })
                 .catch(error => {
                     console.error('Error fetching current config:', error);
                     document.getElementById('current-media-dir-display').textContent = 'Error loading config';
                     document.getElementById('current-grid-size-display').textContent = 'Error loading config';
+                    document.getElementById('current-autoplay-display').textContent = 'Error loading config';
+                    document.getElementById('current-muted-display').textContent = 'Error loading config';
+                    document.getElementById('current-autoplay-next-display').textContent = 'Error loading config';
+                    document.getElementById('current-auto-replay-display').textContent = 'Error loading config';
                 });
         }
 
@@ -129,6 +225,10 @@
             // However, a simpler approach might be needed if the response doesn't provide the X-Current-Media-Dir header reliably.
             // For now, the hx-on::after-request on the form tries to update based on a header and then re-fetches.
         });
+
+        function goBack() {
+            history.back();
+        }
     </script>
 </body>
 </html> 

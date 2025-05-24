@@ -1,0 +1,484 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Background Jobs Monitor - Media Browser</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a73e8',
+                        slate: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+</head>
+<body class="bg-slate-900 text-slate-200 min-h-screen font-sans">
+    <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <a href="/" class="text-xl lg:text-2xl font-semibold text-white hover:text-primary transition-colors duration-150">Media Browser</a>
+                <div class="flex items-center space-x-4">
+                    <a href="{{ url_for('thumbnail_tools_page') }}" 
+                       class="flex items-center text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1">
+                            <path fill-rule="evenodd" d="M2.843 3.913A.75.75 0 0 0 2.25 4.5v11a.75.75 0 0 0 .593.737l3.521.88a.75.75 0 0 0 .874-.468l1.408-3.755a.75.75 0 0 1 1.428-.001l1.407 3.755a.75.75 0 0 0 .875.468l3.52-.88a.75.75 0 0 0 .594-.737V4.5a.75.75 0 0 0-.594-.737l-3.52-.88a.75.75 0 0 0-.875.468L11.16 6.105a.75.75 0 0 1-1.428.001L8.325 2.355a.75.75 0 0 0-.874-.468l-3.521.88.002-.001ZM4.463 4.58L7.5 3.75v3.479l-2.514.63a.75.75 0 0 0-.522.715v4.065L4.463 15.42V4.58Zm11.074 10.84L12.5 16.25V8.802l2.515-.63a.75.75 0 0 0 .52-.715V4.58l3.038.761v10.84Z" clip-rule="evenodd" />
+                        </svg>
+                        Processing Tools
+                    </a>
+                     <a href="{{ url_for('settings_page') }}" 
+                       class="text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700"
+                       title="Settings">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                            <path fill-rule="evenodd" d="M11.078 2.25c-.217 0-.434.03-.642.08c-.262.064-.522.154-.776.27A52.346 52.346 0 0 0 6.22 3.987a.75.75 0 0 0-.618.928c.09.23.2.452.323.668C6.8 7.04 7.5 8.87 7.5 10.5c0 1.63-.7 3.46-1.577 4.915-.123.216-.233.438-.323.668a.75.75 0 0 0 .618.928c.598.288 1.236.533 1.918.731a52.532 52.532 0 0 0 3.376.432c.217 0 .434-.03.642-.08c.262-.064.522-.154.776-.27.598-.288 1.236-.533 1.918-.731a.75.75 0 0 0 .618-.928c-.09-.23-.2-.452-.323-.668C13.2 13.96 12.5 12.13 12.5 10.5c0-1.63.7-3.46 1.577-4.915.123-.216-.233.438-.323.668a.75.75 0 0 0-.618-.928A52.532 52.532 0 0 0 11.078 2.25ZM10 12.25a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5Z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    <button onclick="goBack()" class="flex items-center text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1">
+                            <path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.56l2.72 2.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 1.06L5.56 9.25H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd" />
+                        </svg>
+                        Go Back
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+        <!-- Page Stats and Controls -->
+        <div class="mb-6 bg-slate-800 rounded-xl p-6 shadow-xl border border-slate-700">
+            <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div class="flex items-center space-x-6">
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-green-400 rounded-full mr-2"></div>
+                        <span class="text-sm font-medium text-slate-300">
+                            Total Jobs: <span id="total-jobs-count" class="text-green-400 font-semibold">0</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-blue-400 rounded-full animate-pulse mr-2"></div>
+                        <span class="text-sm font-medium text-slate-300">
+                            Running: <span id="running-jobs-count" class="text-blue-400 font-semibold">0</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-green-500 rounded-full mr-2"></div>
+                        <span class="text-sm font-medium text-slate-300">
+                            Completed: <span id="completed-jobs-count" class="text-green-500 font-semibold">0</span>
+                        </span>
+                    </div>
+                    <div class="flex items-center">
+                        <div class="w-3 h-3 bg-red-400 rounded-full mr-2"></div>
+                        <span class="text-sm font-medium text-slate-300">
+                            Failed: <span id="failed-jobs-count" class="text-red-400 font-semibold">0</span>
+                        </span>
+                    </div>
+                </div>
+                
+                <div class="flex items-center space-x-3">
+                    <!-- Auto-refresh toggle -->
+                    <div class="flex items-center space-x-2">
+                        <span class="text-xs text-slate-400">Auto-refresh</span>
+                        <button id="auto-refresh-toggle" 
+                                onclick="toggleAutoRefresh()"
+                                class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 bg-primary">
+                            <span id="auto-refresh-dot" class="inline-block h-3 w-3 transform rounded-full bg-white shadow-lg transition-transform duration-200 translate-x-5"></span>
+                        </button>
+                    </div>
+                    
+                    <!-- Filter dropdown -->
+                    <select id="job-filter" onchange="filterJobs()" class="bg-slate-700 border border-slate-600 rounded-md text-slate-200 text-sm px-3 py-1 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                        <option value="all">All Jobs</option>
+                        <option value="running">Running Only</option>
+                        <option value="completed">Completed Only</option>
+                        <option value="failed">Failed Only</option>
+                    </select>
+                    
+                    <!-- Refresh button -->
+                    <button onclick="refreshAllJobs()" class="bg-slate-700 hover:bg-slate-600 text-slate-300 px-4 py-2 rounded-md transition-colors duration-150 flex items-center text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 mr-2">
+                            <path fill-rule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clip-rule="evenodd" />
+                        </svg>
+                        Refresh
+                    </button>
+                    
+                    <!-- Clear completed jobs -->
+                    <button onclick="clearCompletedJobs()" class="bg-slate-600 hover:bg-slate-500 text-slate-300 px-4 py-2 rounded-md transition-colors duration-150 flex items-center text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 mr-2">
+                            <path fill-rule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 013.878.512.75.75 0 11-.256 1.478l-.209-.035-1.005 13.07a3 3 0 01-2.991 2.77H8.084a3 3 0 01-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 01-.256-1.478A48.567 48.567 0 017.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 013.369 0c1.603.051 2.815 1.387 2.815 2.951zm-6.136-1.452a51.196 51.196 0 013.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 00-6 0v-.113c0-.794.609-1.428 1.364-1.452zm-.355 5.945a.75.75 0 10-1.5.058l.347 9a.75.75 0 101.499-.058l-.346-9zm5.48.058a.75.75 0 10-1.498-.058l-.347 9a.75.75 0 001.5.058l.345-9z" clip-rule="evenodd" />
+                        </svg>
+                        Clear Completed
+                    </button>
+                </div>
+            </div>
+        </div>
+
+        <!-- Jobs Container -->
+        <div id="jobs-main-container">
+            <div id="no-jobs-message" class="text-center py-12 bg-slate-800 rounded-xl shadow-xl border border-slate-700">
+                <div class="flex flex-col items-center">
+                    <div class="p-4 bg-slate-700/50 rounded-full mb-4">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-8 h-8 text-slate-400">
+                            <path fill-rule="evenodd" d="M6.75 2.25A.75.75 0 017.5 3h9a.75.75 0 01.75.75v2.25a.75.75 0 01-.75.75h-9a.75.75 0 01-.75-.75V3a.75.75 0 01.75-.75zM6 6.75c0-.552.448-1 1-1h10c.552 0 1 .448 1 1v11.25a.75.75 0 01-.75.75H6.75a.75.75 0 01-.75-.75V6.75zm.75 1.5v10.5h9.75V8.25h-9.75z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    <h3 class="text-lg font-semibold text-slate-300 mb-2">No Background Jobs</h3>
+                    <p class="text-slate-500 text-sm max-w-md">No background jobs are currently running or completed. Start some media processing operations to see them here.</p>
+                    <a href="{{ url_for('thumbnail_tools_page') }}" class="mt-4 bg-primary hover:bg-primary/90 text-white px-4 py-2 rounded-lg transition-colors duration-150 text-sm">
+                        Go to Media Processing Tools
+                    </a>
+                </div>
+            </div>
+            
+            <div id="jobs-grid" class="grid gap-4 md:grid-cols-2 lg:grid-cols-3 hidden">
+                <!-- Jobs will be inserted here -->
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-0 right-0 p-6 space-y-3 z-[100]">
+        <!-- Toasts will be appended here -->
+    </div>
+
+    <script>
+        // Global variables
+        let allJobs = [];
+        let autoRefreshEnabled = true;
+        let autoRefreshInterval = null;
+        let currentFilter = 'all';
+        let previousJobStates = new Map(); // To track job state changes for notifications
+
+        function goBack() {
+            history.back();
+        }
+
+        function toggleAutoRefresh() {
+            autoRefreshEnabled = !autoRefreshEnabled;
+            const toggle = document.getElementById('auto-refresh-toggle');
+            const dot = document.getElementById('auto-refresh-dot');
+            
+            if (autoRefreshEnabled) {
+                toggle.className = 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 bg-primary';
+                dot.className = 'inline-block h-3 w-3 transform rounded-full bg-white shadow-lg transition-transform duration-200 translate-x-5';
+                startAutoRefresh();
+            } else {
+                toggle.className = 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 bg-slate-600';
+                dot.className = 'inline-block h-3 w-3 transform rounded-full bg-white shadow-lg transition-transform duration-200 translate-x-0';
+                stopAutoRefresh();
+            }
+        }
+
+        function startAutoRefresh() {
+            if (autoRefreshInterval) return;
+            autoRefreshInterval = setInterval(refreshAllJobs, 2000);
+        }
+
+        function stopAutoRefresh() {
+            if (autoRefreshInterval) {
+                clearInterval(autoRefreshInterval);
+                autoRefreshInterval = null;
+            }
+        }
+
+        function refreshAllJobs() {
+            fetch('/jobs')
+                .then(response => response.json())
+                .then(data => {
+                    const newJobs = data.jobs;
+                    checkForCompletedJobsAndNotify(newJobs); // Check for notifications before updating allJobs
+                    allJobs = newJobs;
+                    updateJobsDisplay();
+                    updateStats();
+                })
+                .catch(error => {
+                    console.error('Error fetching jobs:', error);
+                });
+        }
+
+        function filterJobs() {
+            currentFilter = document.getElementById('job-filter').value;
+            updateJobsDisplay();
+        }
+
+        function updateJobsDisplay() {
+            const filteredJobs = getFilteredJobs();
+            const container = document.getElementById('jobs-grid');
+            const noJobsMessage = document.getElementById('no-jobs-message');
+            
+            if (filteredJobs.length === 0) {
+                container.classList.add('hidden');
+                noJobsMessage.classList.remove('hidden');
+                return;
+            }
+            
+            noJobsMessage.classList.add('hidden');
+            container.classList.remove('hidden');
+            container.innerHTML = filteredJobs.map(job => createJobCard(job)).join('');
+        }
+
+        function getFilteredJobs() {
+            switch (currentFilter) {
+                case 'running':
+                    return allJobs.filter(job => job.status === 'running');
+                case 'completed':
+                    return allJobs.filter(job => job.status === 'completed');
+                case 'failed':
+                    return allJobs.filter(job => job.status === 'failed');
+                default:
+                    return allJobs;
+            }
+        }
+
+        function updateStats() {
+            const running = allJobs.filter(job => job.status === 'running').length;
+            const completed = allJobs.filter(job => job.status === 'completed').length;
+            const failed = allJobs.filter(job => job.status === 'failed').length;
+            
+            document.getElementById('total-jobs-count').textContent = allJobs.length;
+            document.getElementById('running-jobs-count').textContent = running;
+            document.getElementById('completed-jobs-count').textContent = completed;
+            document.getElementById('failed-jobs-count').textContent = failed;
+        }
+
+        function checkForCompletedJobsAndNotify(newJobs) {
+            newJobs.forEach(job => {
+                const previousState = previousJobStates.get(job.job_id);
+                if (previousState === 'running' && (job.status === 'completed' || job.status === 'failed')) {
+                    showToast(job.result?.message || job.error || `Job ${job.status}`, job.description, job.status);
+                }
+                previousJobStates.set(job.job_id, job.status);
+            });
+
+            // Clean up old job states if job no longer exists
+            const currentJobIds = new Set(newJobs.map(j => j.job_id));
+            for (const jobId of previousJobStates.keys()) {
+                if (!currentJobIds.has(jobId)) {
+                    previousJobStates.delete(jobId);
+                }
+            }
+        }
+
+        function showToast(message, description, status = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toastId = `toast-${Date.now()}`;
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = `max-w-sm w-full bg-slate-800 shadow-2xl rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden border ${status === 'completed' ? 'border-green-500' : status === 'failed' ? 'border-red-500' : 'border-blue-500'}`;
+
+            const iconColor = status === 'completed' ? 'text-green-400' : status === 'failed' ? 'text-red-400' : 'text-blue-400';
+            let iconSvg = '';
+            if (status === 'completed') {
+                iconSvg = `
+                    <svg class="h-6 w-6 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>`;
+            } else if (status === 'failed') {
+                iconSvg = `
+                    <svg class="h-6 w-6 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.249-8.25-3.286zm0 13.036h.008v.008H12v-.008z" />
+                    </svg>`;
+            } else { // Default info/running icon
+                 iconSvg = `
+                    <svg class="h-6 w-6 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                    </svg>`;
+            }
+
+            toast.innerHTML = `
+                <div class="p-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            ${iconSvg}
+                        </div>
+                        <div class="ml-3 w-0 flex-1 pt-0.5">
+                            <p class="text-sm font-semibold text-slate-100">${description}</p>
+                            <p class="mt-1 text-xs text-slate-300">${message}</p>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 flex">
+                            <button type="button" onclick="document.getElementById('${toastId}').remove()" class="inline-flex bg-slate-800 rounded-md p-1 text-slate-400 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-600">
+                                <span class="sr-only">Close</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(toast);
+
+            // Auto-remove toast after some time (e.g., 7 seconds)
+            setTimeout(() => {
+                const currentToast = document.getElementById(toastId);
+                if (currentToast) {
+                    currentToast.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+                    setTimeout(() => currentToast.remove(), 500); // Remove after fade out
+                }
+            }, 7000);
+        }
+
+        function createJobCard(job) {
+            const progressPercent = job.total > 0 ? Math.round((job.progress / job.total) * 100) : 0;
+            const statusColor = {
+                'running': 'border-blue-500 bg-blue-500/10',
+                'completed': 'border-green-500 bg-green-500/10',
+                'failed': 'border-red-500 bg-red-500/10'
+            }[job.status] || 'border-slate-600 bg-slate-700/50';
+
+            const statusIcon = {
+                'running': '🔄',
+                'completed': '✅',
+                'failed': '❌'
+            }[job.status] || '⏳';
+
+            const statusTextColor = {
+                'running': 'text-blue-400',
+                'completed': 'text-green-400',
+                'failed': 'text-red-400'
+            }[job.status] || 'text-slate-400';
+
+            return `
+                <div class="bg-slate-800 rounded-lg border-2 ${statusColor} p-6 shadow-xl">
+                    <div class="flex items-center justify-between mb-4">
+                        <div class="flex items-center space-x-3">
+                            <span class="text-2xl">${statusIcon}</span>
+                            <div>
+                                <h3 class="font-semibold text-slate-100">${job.description}</h3>
+                                <p class="text-xs ${statusTextColor} capitalize font-medium">${job.status}</p>
+                            </div>
+                        </div>
+                        ${job.status !== 'running' ? `
+                            <button onclick="removeJob('${job.job_id}')" 
+                                    class="text-slate-400 hover:text-red-400 transition-colors p-1 rounded hover:bg-slate-700/50">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                </svg>
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    <div class="space-y-3">
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-400">Job Type:</span>
+                            <span class="text-slate-200 capitalize">${job.job_type.replace('_', ' ')}</span>
+                        </div>
+                        
+                        <div class="flex justify-between text-sm">
+                            <span class="text-slate-400">Started:</span>
+                            <span class="text-slate-200">${new Date(job.start_time).toLocaleString()}</span>
+                        </div>
+                        
+                        ${job.end_time ? `
+                            <div class="flex justify-between text-sm">
+                                <span class="text-slate-400">${job.status === 'completed' ? 'Completed:' : 'Ended:'}</span>
+                                <span class="text-slate-200">${new Date(job.end_time).toLocaleString()}</span>
+                            </div>
+                        ` : ''}
+                        
+                        ${job.status === 'running' ? `
+                            <div class="space-y-2">
+                                <div class="flex justify-between text-sm">
+                                    <span class="text-slate-400">Progress:</span>
+                                    <span class="text-slate-200">${job.progress}/${job.total} (${progressPercent}%)</span>
+                                </div>
+                                <div class="w-full bg-slate-700 rounded-full h-2.5">
+                                    <div class="bg-blue-500 h-2.5 rounded-full transition-all duration-500" style="width: ${progressPercent}%"></div>
+                                </div>
+                                ${job.current_item ? `
+                                    <div class="text-xs text-slate-400 truncate" title="${job.current_item}">
+                                        Current: ${job.current_item}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+                        
+                        ${job.status === 'completed' && job.result ? `
+                            <div class="bg-green-500/20 border border-green-500/50 rounded-md p-3">
+                                <p class="text-green-400 text-sm font-medium">✓ ${job.result.message || 'Completed successfully'}</p>
+                                ${Object.keys(job.result).filter(k => k !== 'message').length > 0 ? `
+                                    <div class="mt-2 space-y-1">
+                                        ${Object.entries(job.result).filter(([k,v]) => k !== 'message').map(([key, value]) => `
+                                            <div class="text-xs text-green-300">
+                                                <span class="capitalize">${key.replace('_', ' ')}:</span> ${value}
+                                            </div>
+                                        `).join('')}
+                                    </div>
+                                ` : ''}
+                            </div>
+                        ` : ''}
+                        
+                        ${job.status === 'failed' && job.error ? `
+                            <div class="bg-red-500/20 border border-red-500/50 rounded-md p-3">
+                                <p class="text-red-400 text-sm font-medium">✗ Error</p>
+                                <p class="text-red-300 text-xs mt-1 break-words">${job.error}</p>
+                            </div>
+                        ` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function removeJob(jobId) {
+            if (confirm('Are you sure you want to remove this job from the list?')) {
+                fetch(`/jobs/${jobId}`, { method: 'DELETE' })
+                    .then(() => {
+                        refreshAllJobs();
+                    })
+                    .catch(error => {
+                        console.error('Error removing job:', error);
+                    });
+            }
+        }
+
+        function clearCompletedJobs() {
+            const completedJobs = allJobs.filter(job => job.status === 'completed' || job.status === 'failed');
+            if (completedJobs.length === 0) {
+                alert('No completed or failed jobs to clear.');
+                return;
+            }
+            
+            if (confirm(`Are you sure you want to clear ${completedJobs.length} completed/failed jobs?`)) {
+                Promise.all(
+                    completedJobs.map(job => fetch(`/jobs/${job.job_id}`, { method: 'DELETE' }))
+                ).then(() => {
+                    refreshAllJobs();
+                }).catch(error => {
+                    console.error('Error clearing jobs:', error);
+                });
+            }
+        }
+
+        // Initialize page
+        document.addEventListener('DOMContentLoaded', function() {
+            refreshAllJobs();
+            startAutoRefresh();
+        });
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            stopAutoRefresh();
+        });
+    </script>
+</body>
+</html> 

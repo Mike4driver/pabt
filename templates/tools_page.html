@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Media Processing Tools - Media Browser</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -34,15 +35,158 @@
     <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div class="flex justify-between items-center h-16">
-                <h1 class="text-xl lg:text-2xl font-semibold text-white">Media Processing Tools</h1>
-                <a href="/" class="text-sm font-medium text-primary hover:text-primary/80 transition-colors duration-150">
-                    &larr; Back to Media Browser
-                </a>
+                <a href="/" class="text-xl lg:text-2xl font-semibold text-white hover:text-primary transition-colors duration-150">Media Browser</a>
+                <div class="flex items-center space-x-4">
+                    <a href="{{ url_for('background_jobs_page') }}" 
+                       class="flex items-center text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1">
+                            <path d="M10 12.5a2.5 2.5 0 1 0 0-5 2.5 2.5 0 0 0 0 5Z" />
+                            <path fill-rule="evenodd" d="M.664 10.59a1.651 1.651 0 0 1 0-1.186A10.004 10.004 0 0 1 10 3c4.257 0 7.893 2.66 9.336 6.404a1.65 1.65 0 0 1 0 1.186A10.004 10.004 0 0 1 10 17c-4.257 0-7.893-2.66-9.336-6.404ZM10 5a7.997 7.997 0 0 1 7.938 5.556A7.997 7.997 0 0 1 10 15a7.997 7.997 0 0 1-7.938-4.444A7.997 7.997 0 0 1 10 5Z" clip-rule="evenodd" />
+                        </svg>
+                        Job Monitor
+                    </a>
+                    <a href="{{ url_for('settings_page') }}" 
+                       class="text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700"
+                       title="Settings">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                            <path fill-rule="evenodd" d="M11.078 2.25c-.217 0-.434.03-.642.08c-.262.064-.522.154-.776.27A52.346 52.346 0 0 0 6.22 3.987a.75.75 0 0 0-.618.928c.09.23.2.452.323.668C6.8 7.04 7.5 8.87 7.5 10.5c0 1.63-.7 3.46-1.577 4.915-.123.216-.233.438-.323.668a.75.75 0 0 0 .618.928c.598.288 1.236.533 1.918.731a52.532 52.532 0 0 0 3.376.432c.217 0 .434-.03.642-.08c.262-.064.522-.154.776-.27.598-.288 1.236-.533 1.918-.731a.75.75 0 0 0 .618-.928c-.09-.23-.2-.452-.323-.668C13.2 13.96 12.5 12.13 12.5 10.5c0-1.63.7-3.46 1.577-4.915.123-.216-.233.438-.323.668a.75.75 0 0 0-.618-.928A52.532 52.532 0 0 0 11.078 2.25ZM10 12.25a1.75 1.75 0 1 0 0-3.5 1.75 1.75 0 0 0 0 3.5Z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                    <button onclick="goBack()" class="flex items-center text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1">
+                            <path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.56l2.72 2.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 1.06L5.56 9.25H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd" />
+                        </svg>
+                        Go Back
+                    </button>
+                </div>
             </div>
         </div>
     </header>
 
     <main class="max-w-3xl mx-auto p-4 sm:p-6 lg:p-8 space-y-8">
+        <div x-data="{ activeTab: 'thumbnails' }">
+            <!-- Tabs -->
+            <div class="mb-6 border-b border-slate-700">
+                <nav class="-mb-px flex space-x-6" aria-label="Tabs">
+                    <button @click="activeTab = 'thumbnails'" 
+                            :class="{ 'border-primary text-primary': activeTab === 'thumbnails', 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500': activeTab !== 'thumbnails' }"
+                            class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors duration-150 focus:outline-none">
+                        Thumbnails
+                    </button>
+                    <button @click="activeTab = 'transcoding'" 
+                            :class="{ 'border-primary text-primary': activeTab === 'transcoding', 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500': activeTab !== 'transcoding' }"
+                            class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors duration-150 focus:outline-none">
+                        Transcoding
+                    </button>
+                    <button @click="activeTab = 'previews'" 
+                            :class="{ 'border-primary text-primary': activeTab === 'previews', 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500': activeTab !== 'previews' }"
+                            class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors duration-150 focus:outline-none">
+                        Hover Previews
+                    </button>
+                    <button @click="activeTab = 'database'" 
+                            :class="{ 'border-primary text-primary': activeTab === 'database', 'border-transparent text-slate-400 hover:text-slate-200 hover:border-slate-500': activeTab !== 'database' }"
+                            class="whitespace-nowrap py-3 px-1 border-b-2 font-medium text-sm transition-colors duration-150 focus:outline-none">
+                        Database & Sync
+                    </button>
+                </nav>
+            </div>
+
+            <!-- Thumbnails Section -->
+            <div x-show="activeTab === 'thumbnails'" class="space-y-6">
+                <div class="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
+                    <h2 class="text-lg font-semibold text-slate-100 mb-4">Generate All Video Thumbnails</h2>
+                    <p class="text-sm text-slate-400 mb-4">
+                        This will generate thumbnails for all videos in your library that don't currently have one.
+                        This process runs in the background.
+                    </p>
+                    <button hx-post="/generate-all-video-thumbnails" 
+                            hx-target="#thumbnail-job-status"
+                            hx-swap="innerHTML"
+                            class="px-4 py-2 bg-primary text-white text-sm rounded-md hover:bg-primary/80 transition-colors duration-150 shadow-sm">
+                        Generate All Thumbnails
+                    </button>
+                    <div id="thumbnail-job-status" class="mt-4"></div>
+                </div>
+            </div>
+
+            <!-- Transcoding Section -->
+            <div x-show="activeTab === 'transcoding'" class="space-y-6">
+                <div class="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
+                    <h2 class="text-lg font-semibold text-slate-100 mb-4">Transcode All Videos</h2>
+                    <p class="text-sm text-slate-400 mb-4">
+                        Transcode all videos to a web-optimized MP4 format. This is useful for broader compatibility and faster streaming.
+                        This process runs in the background and can take a significant amount of time.
+                    </p>
+                    <button hx-post="/transcode-all-videos" 
+                            hx-target="#transcode-job-status"
+                            hx-swap="innerHTML"
+                            class="px-4 py-2 bg-primary text-white text-sm rounded-md hover:bg-primary/80 transition-colors duration-150 shadow-sm">
+                        Transcode All Videos (Default Settings)
+                    </button>
+                    <div id="transcode-job-status" class="mt-4"></div>
+                </div>
+                <!-- Advanced Transcoding Options could be added here later -->
+            </div>
+
+            <!-- Hover Previews Section -->
+            <div x-show="activeTab === 'previews'" class="space-y-6">
+                <div class="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
+                    <h2 class="text-lg font-semibold text-slate-100 mb-4">Generate All Hover Previews</h2>
+                    <p class="text-sm text-slate-400 mb-4">
+                        Create short, muted video previews that play on mouse hover in the media browser.
+                        This process runs in the background.
+                    </p>
+                    <button hx-post="/generate-all-previews" 
+                            hx-target="#preview-job-status"
+                            hx-swap="innerHTML"
+                            class="px-4 py-2 bg-primary text-white text-sm rounded-md hover:bg-primary/80 transition-colors duration-150 shadow-sm">
+                        Generate All Hover Previews
+                    </button>
+                    <div id="preview-job-status" class="mt-4"></div>
+                </div>
+            </div>
+
+            <!-- Database & Sync Section -->
+            <div x-show="activeTab === 'database'" class="space-y-6">
+                <div class="bg-slate-800 p-6 rounded-lg shadow-md border border-slate-700">
+                    <h2 class="text-lg font-semibold text-slate-100 mb-4">Scan Media Directory</h2>
+                    <p class="text-sm text-slate-400 mb-4">
+                        Scan the configured media directory for new files, update metadata for existing ones,
+                        and remove entries for files that no longer exist. This helps keep your library in sync.
+                        This process runs in the background.
+                    </p>
+                    <button hx-post="/tools/scan-media-directory" 
+                            hx-target="#scan-media-job-status"
+                            hx-swap="outerHTML"
+                            class="px-4 py-2 bg-primary text-white text-sm rounded-md hover:bg-primary/80 transition-colors duration-150 shadow-sm">
+                        Scan Media Directory & Update Database
+                    </button>
+                    <div id="scan-media-job-status" class="mt-4"></div>
+                </div>
+                <!-- Other database tools like clear_db could be added here -->
+            </div>
+        </div>
+
+        <!-- Background Jobs Status Section -->
+        <div id="background-jobs-section" class="bg-slate-800 p-6 rounded-xl shadow-xl border border-slate-700 hidden">
+            <div class="flex items-center justify-between mb-4">
+                <h2 class="text-xl font-semibold text-slate-100 flex items-center">
+                    <div class="p-2 bg-blue-500/20 rounded-full mr-3">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-blue-400">
+                            <path fill-rule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clip-rule="evenodd" />
+                        </svg>
+                    </div>
+                    Background Jobs
+                </h2>
+                <button onclick="refreshJobs()" class="text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 px-3 py-1 rounded-md transition-colors duration-150">
+                    Refresh
+                </button>
+            </div>
+            <div id="jobs-container" class="space-y-3">
+                <!-- Jobs will be inserted here -->
+            </div>
+        </div>
+
         <!-- Thumbnail Generation Section -->
         <div class="bg-slate-800 p-6 sm:p-8 rounded-xl shadow-xl border border-slate-700">
             <div class="flex items-center mb-6">
@@ -61,6 +205,7 @@
                 hx-target="#thumbnail-status-message"
                 hx-swap="innerHTML"
                 hx-indicator="#loading-spinner-thumbnails"
+                hx-on:htmx:after-request="handleJobStart(event)"
                 class="w-full bg-primary/80 text-white font-semibold py-3 px-6 rounded-lg hover:bg-primary focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-base">
                 <span id="loading-spinner-thumbnails" class="htmx-indicator animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-3"></span>
                 Generate Missing Thumbnails
@@ -86,7 +231,7 @@
             </p>
             
             <!-- Transcoding Options Form -->
-            <form hx-post="/transcode-all-videos-with-options" hx-target="#transcoding-status-message" hx-swap="innerHTML" hx-indicator="#loading-spinner-transcoding">
+            <form hx-post="/transcode-all-videos-with-options" hx-target="#transcoding-status-message" hx-swap="innerHTML" hx-indicator="#loading-spinner-transcoding" hx-on:htmx:after-request="handleJobStart(event)">
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-6">
                     <div>
                         <label for="resolution" class="block text-sm font-medium text-slate-300 mb-2">Resolution</label>
@@ -185,6 +330,7 @@
                 hx-target="#preview-status-message"
                 hx-swap="innerHTML"
                 hx-indicator="#loading-spinner-previews"
+                hx-on:htmx:after-request="handleJobStart(event)"
                 class="w-full bg-purple-600 text-white font-semibold py-3 px-6 rounded-lg hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-base">
                 <span id="loading-spinner-previews" class="htmx-indicator animate-spin h-5 w-5 border-2 border-white border-t-transparent rounded-full mr-3"></span>
                 Generate All Hover Previews
@@ -200,6 +346,11 @@
         </div>
     </main>
 
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-0 right-0 p-6 space-y-3 z-[100]">
+        <!-- Toasts will be appended here -->
+    </div>
+
     <script>
         function toggleQualityOptions() {
             const qualityMode = document.getElementById('quality_mode').value;
@@ -214,6 +365,260 @@
                 bitrateContainer.style.display = 'block';
             }
         }
+
+        function goBack() {
+            history.back();
+        }
+
+        // Background job monitoring
+        let activeJobs = new Set();
+        let jobPollingInterval = null;
+        let previousToolPageJobStates = new Map(); // To track job state changes for notifications on this page
+
+        function handleJobStart(event) {
+            try {
+                const response = JSON.parse(event.detail.xhr.responseText);
+                if (response.job_id) {
+                    activeJobs.add(response.job_id);
+                    showJobsSection();
+                    startJobPolling();
+                    
+                    // Update the status message with job info
+                    const target = event.detail.target;
+                    if (target) {
+                        target.innerHTML = `<div class="text-blue-400">Started in background: ${response.message}</div>`;
+                    }
+                }
+            } catch (e) {
+                console.error('Error parsing job start response:', e);
+            }
+        }
+
+        function showJobsSection() {
+            document.getElementById('background-jobs-section').classList.remove('hidden');
+        }
+
+        function hideJobsSection() {
+            document.getElementById('background-jobs-section').classList.add('hidden');
+        }
+
+        function startJobPolling() {
+            if (jobPollingInterval) return; // Already polling
+            
+            jobPollingInterval = setInterval(() => {
+                if (activeJobs.size === 0) {
+                    stopJobPolling();
+                    return;
+                }
+                refreshJobs();
+            }, 2000); // Poll every 2 seconds
+        }
+
+        function stopJobPolling() {
+            if (jobPollingInterval) {
+                clearInterval(jobPollingInterval);
+                jobPollingInterval = null;
+            }
+        }
+
+        function refreshJobs() {
+            fetch('/jobs')
+                .then(response => response.json())
+                .then(data => {
+                    updateJobsDisplay(data.jobs);
+                    checkForToolPageCompletedJobsAndNotify(data.jobs);
+                })
+                .catch(error => {
+                    console.error('Error fetching jobs:', error);
+                });
+        }
+
+        function updateJobsDisplay(jobs) {
+            const container = document.getElementById('jobs-container');
+            
+            if (jobs.length === 0) {
+                hideJobsSection();
+                activeJobs.clear();
+                stopJobPolling();
+                return;
+            }
+
+            // Update active jobs set
+            activeJobs.clear();
+            jobs.forEach(job => {
+                if (job.status === 'running') {
+                    activeJobs.add(job.job_id);
+                }
+            });
+
+            container.innerHTML = jobs.map(job => createJobElement(job)).join('');
+            
+            // Stop polling if no running jobs
+            if (activeJobs.size === 0) {
+                setTimeout(() => {
+                    if (activeJobs.size === 0) {
+                        stopJobPolling();
+                    }
+                }, 5000); // Keep showing results for 5 seconds, then stop polling if still no active jobs
+            }
+        }
+
+        function createJobElement(job) {
+            const progressPercent = job.total > 0 ? Math.round((job.progress / job.total) * 100) : 0;
+            const statusColor = {
+                'running': 'text-blue-400',
+                'completed': 'text-green-400',
+                'failed': 'text-red-400'
+            }[job.status] || 'text-slate-400';
+
+            const statusIcon = {
+                'running': '🔄',
+                'completed': '✅',
+                'failed': '❌'
+            }[job.status] || '⏳';
+
+            return `
+                <div class="bg-slate-700/50 rounded-lg p-4 border border-slate-600">
+                    <div class="flex items-center justify-between mb-2">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-lg">${statusIcon}</span>
+                            <span class="font-medium text-slate-200">${job.description}</span>
+                            <span class="text-xs ${statusColor} capitalize">${job.status}</span>
+                        </div>
+                        ${job.status !== 'running' ? `
+                            <button onclick="removeJob('${job.job_id}')" class="text-xs text-slate-400 hover:text-slate-300 px-2 py-1 rounded">
+                                ✕
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    ${job.status === 'running' ? `
+                        <div class="mb-2">
+                            <div class="flex justify-between text-xs text-slate-400 mb-1">
+                                <span>${job.current_item || 'Processing...'}</span>
+                                <span>${job.progress}/${job.total} (${progressPercent}%)</span>
+                            </div>
+                            <div class="w-full bg-slate-600 rounded-full h-2">
+                                <div class="bg-blue-500 h-2 rounded-full transition-all duration-300" style="width: ${progressPercent}%"></div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${job.status === 'completed' && job.result ? `
+                        <div class="text-xs text-green-400 mt-2">
+                            ${job.result.message || 'Completed successfully'}
+                        </div>
+                    ` : ''}
+                    
+                    ${job.status === 'failed' && job.error ? `
+                        <div class="text-xs text-red-400 mt-2">
+                            Error: ${job.error}
+                        </div>
+                    ` : ''}
+                    
+                    <div class="text-xs text-slate-500 mt-2">
+                        Started: ${new Date(job.start_time).toLocaleTimeString()}
+                        ${job.end_time ? `• Finished: ${new Date(job.end_time).toLocaleTimeString()}` : ''}
+                    </div>
+                </div>
+            `;
+        }
+
+        function removeJob(jobId) {
+            fetch(`/jobs/${jobId}`, { method: 'DELETE' })
+                .then(() => {
+                    refreshJobs();
+                })
+                .catch(error => {
+                    console.error('Error removing job:', error);
+                });
+        }
+
+        function checkForToolPageCompletedJobsAndNotify(newJobs) {
+            const jobsOnThisPage = newJobs.filter(job => activeJobs.has(job.job_id) || previousToolPageJobStates.has(job.job_id));
+
+            jobsOnThisPage.forEach(job => {
+                const previousState = previousToolPageJobStates.get(job.job_id);
+                if (previousState === 'running' && (job.status === 'completed' || job.status === 'failed')) {
+                    showToastOnToolsPage(job.result?.message || job.error || `Job ${job.status}`, job.description, job.status);
+                }
+                previousToolPageJobStates.set(job.job_id, job.status);
+            });
+
+            // Clean up old job states if job no longer exists or is no longer managed by this page
+            const currentJobIds = new Set(jobsOnThisPage.map(j => j.job_id));
+            for (const jobId of previousToolPageJobStates.keys()) {
+                if (!currentJobIds.has(jobId)) {
+                    previousToolPageJobStates.delete(jobId);
+                }
+            }
+        }
+
+        function showToastOnToolsPage(message, description, status = 'info') {
+            const container = document.getElementById('toast-container');
+            if (!container) return;
+
+            const toastId = `toast-tools-${Date.now()}`;
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            toast.className = `max-w-sm w-full bg-slate-800 shadow-2xl rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden border ${status === 'completed' ? 'border-green-500' : status === 'failed' ? 'border-red-500' : 'border-blue-500'}`;
+
+            const iconColor = status === 'completed' ? 'text-green-400' : status === 'failed' ? 'text-red-400' : 'text-blue-400';
+            let iconSvg = '';
+            if (status === 'completed') {
+                iconSvg = `
+                    <svg class="h-6 w-6 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>`;
+            } else if (status === 'failed') {
+                iconSvg = `
+                    <svg class="h-6 w-6 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0-10.036A11.959 11.959 0 013.598 6 11.99 11.99 0 003 9.75c0 5.592 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.31-.21-2.57-.598-3.75h-.152c-3.196 0-6.1-1.249-8.25-3.286zm0 13.036h.008v.008H12v-.008z" />
+                    </svg>`;
+            } else { // Default info/running icon
+                 iconSvg = `
+                    <svg class="h-6 w-6 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+                         <path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" />
+                    </svg>`;
+            }
+
+            toast.innerHTML = `
+                <div class="p-4">
+                    <div class="flex items-start">
+                        <div class="flex-shrink-0">
+                            ${iconSvg}
+                        </div>
+                        <div class="ml-3 w-0 flex-1 pt-0.5">
+                            <p class="text-sm font-semibold text-slate-100">${description}</p>
+                            <p class="mt-1 text-xs text-slate-300">${message}</p>
+                        </div>
+                        <div class="ml-4 flex-shrink-0 flex">
+                            <button type="button" onclick="document.getElementById('${toastId}').remove()" class="inline-flex bg-slate-800 rounded-md p-1 text-slate-400 hover:text-slate-200 focus:outline-none focus:ring-2 focus:ring-slate-600">
+                                <span class="sr-only">Close</span>
+                                <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            container.appendChild(toast);
+
+            setTimeout(() => {
+                const currentToast = document.getElementById(toastId);
+                if (currentToast) {
+                    currentToast.classList.add('opacity-0', 'transition-opacity', 'duration-500');
+                    setTimeout(() => currentToast.remove(), 500);
+                }
+            }, 7000);
+        }
+
+        // Initialize on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Check for existing jobs on page load
+            refreshJobs();
+        });
     </script>
 </body>
 </html> 

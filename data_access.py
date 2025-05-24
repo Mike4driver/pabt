@@ -154,16 +154,91 @@ def format_media_duration(seconds: float | None) -> str | None:
         return None
     return str(timedelta(seconds=int(seconds)))
 
-def get_media_files_from_db(search_query: str = None):
-    """Fetches media files from the database, optionally filtering by search_query."""
+def get_media_files_from_db(
+    search_query: str = None, 
+    page: int = 1, 
+    per_page: int = 20, 
+    media_type_filter: str = None,
+    tags_filter: list = None,
+    sort_by: str = "date_added",
+    sort_order: str = "desc"
+):
+    """
+    Fetches media files from the database with comprehensive search and filtering options.
+    
+    Args:
+        search_query: Text to search in filename, user_title, and tags
+        page: Page number for pagination
+        per_page: Items per page
+        media_type_filter: Filter by media type ('video', 'audio', 'image')
+        tags_filter: List of tags to search for (OR operation)
+        sort_by: Field to sort by ('date_added', 'filename', 'user_title', 'duration', 'size_bytes')
+        sort_order: Sort order ('asc' or 'desc')
+    """
     with db_connection() as conn:
         cursor = conn.cursor()
-        query = "SELECT * FROM media_files"
-        params = []
+        
+        # Build WHERE conditions
+        where_conditions = []
+        count_params = []
+        
+        # Search query - search in filename, user_title, and tags
         if search_query:
-            query += " WHERE filename LIKE ?"
-            params.append(f"%{search_query}%")
-        query += " ORDER BY date_added DESC"
+            search_conditions = [
+                "filename LIKE ?",
+                "user_title LIKE ?",
+                "tags LIKE ?"
+            ]
+            search_param = f"%{search_query}%"
+            where_conditions.append(f"({' OR '.join(search_conditions)})")
+            count_params.extend([search_param, search_param, search_param])
+        
+        # Media type filter
+        if media_type_filter and media_type_filter in ['video', 'audio', 'image']:
+            where_conditions.append("media_type = ?")
+            count_params.append(media_type_filter)
+        
+        # Tags filter (OR operation - match any of the provided tags)
+        if tags_filter and isinstance(tags_filter, list) and tags_filter:
+            tag_conditions = []
+            for tag in tags_filter:
+                if tag.strip():  # Only add non-empty tags
+                    tag_conditions.append("tags LIKE ?")
+                    count_params.append(f'%"{tag.strip()}"%')
+            if tag_conditions:
+                where_conditions.append(f"({' OR '.join(tag_conditions)})")
+        
+        # Build the WHERE clause
+        where_clause = ""
+        if where_conditions:
+            where_clause = "WHERE " + " AND ".join(where_conditions)
+        
+        # Get total count for pagination
+        count_query = f"SELECT COUNT(*) as total FROM media_files {where_clause}"
+        cursor.execute(count_query, count_params)
+        total_count = cursor.fetchone()['total']
+        
+        # Calculate offset and limit
+        offset = (page - 1) * per_page
+        
+        # Build ORDER BY clause
+        valid_sort_fields = {
+            'date_added': 'date_added',
+            'filename': 'filename',
+            'user_title': 'COALESCE(user_title, filename)',  # Use filename if user_title is NULL
+            'duration': 'duration',
+            'size_bytes': 'size_bytes',
+            'media_type': 'media_type'
+        }
+        
+        sort_field = valid_sort_fields.get(sort_by, 'date_added')
+        sort_direction = 'ASC' if sort_order.lower() == 'asc' else 'DESC'
+        order_clause = f"ORDER BY {sort_field} {sort_direction}"
+        
+        # Main query with pagination
+        query = f"SELECT * FROM media_files {where_clause} {order_clause} LIMIT ? OFFSET ?"
+        params = count_params + [per_page, offset]
+        
         cursor.execute(query, params)
         db_rows = cursor.fetchall()
 
@@ -207,7 +282,25 @@ def get_media_files_from_db(search_query: str = None):
             "fps": metadata.get('fps', row['fps'] if row['fps'] else None),
             "original_full_path": row['original_path']
         })
-    return media_list
+    
+    # Calculate pagination info
+    total_pages = (total_count + per_page - 1) // per_page  # Ceiling division
+    has_prev = page > 1
+    has_next = page < total_pages
+    
+    return {
+        'media_files': media_list,
+        'pagination': {
+            'page': page,
+            'per_page': per_page,
+            'total_count': total_count,
+            'total_pages': total_pages,
+            'has_prev': has_prev,
+            'has_next': has_next,
+            'prev_page': page - 1 if has_prev else None,
+            'next_page': page + 1 if has_next else None
+        }
+    }
 
 def get_single_video_details_from_db(video_filename: str):
     """Fetches detailed information for a single video from the database by its filename and also gets the full video queue."""
@@ -273,3 +366,20 @@ def get_single_video_details_from_db(video_filename: str):
     }
 
     return current_video_details, video_list, next_video # Return current video, queue, and next video 
+
+def get_all_tags_from_db():
+    """Get all unique tags from the database for filter suggestions."""
+    with db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT tags FROM media_files WHERE tags IS NOT NULL AND tags != '[]'")
+        rows = cursor.fetchall()
+    
+    all_tags = set()
+    for row in rows:
+        try:
+            tags_list = json.loads(row['tags'])
+            all_tags.update(tags_list)
+        except (json.JSONDecodeError, TypeError):
+            continue
+    
+    return sorted(list(all_tags)) 

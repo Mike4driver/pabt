@@ -55,6 +55,126 @@
     </div>
 </div>
 {% endfor %}
+
+{# Build pagination URL parameters #}
+{% set pagination_params = [] %}
+{% if search_query %}{% set _ = pagination_params.append('search=' + search_query|urlencode) %}{% endif %}
+{% if current_media_type %}{% set _ = pagination_params.append('media_type=' + current_media_type|urlencode) %}{% endif %}
+{% if current_tags %}{% set _ = pagination_params.append('tags=' + current_tags|urlencode) %}{% endif %}
+{% if current_sort_by and current_sort_by != 'date_added' %}{% set _ = pagination_params.append('sort_by=' + current_sort_by|urlencode) %}{% endif %}
+{% if current_sort_order and current_sort_order != 'desc' %}{% set _ = pagination_params.append('sort_order=' + current_sort_order|urlencode) %}{% endif %}
+{% set _ = pagination_params.append('per_page=' + pagination.per_page|string) %}
+{% set pagination_query = '&' + pagination_params|join('&') if pagination_params else '' %}
+
+{# Pagination Controls #}
+{% if pagination.total_pages > 1 %}
+<div class="col-span-full mt-8 mb-4" data-total-count="{{ pagination.total_count }}">
+    <div class="flex items-center justify-between">
+        <div class="text-sm text-slate-400">
+            Showing {{ ((pagination.page - 1) * pagination.per_page) + 1 }} to {% if pagination.page * pagination.per_page > pagination.total_count %}{{ pagination.total_count }}{% else %}{{ pagination.page * pagination.per_page }}{% endif %} of {{ pagination.total_count }} results
+        </div>
+        <nav class="flex items-center space-x-1" aria-label="Pagination">
+            <!-- Previous Page Button -->
+            {% if pagination.has_prev %}
+                <button 
+                    hx-get="/files?page={{ pagination.prev_page }}{{ pagination_query }}"
+                    hx-target="#media-grid"
+                    hx-swap="innerHTML"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-300 bg-slate-700 border border-slate-600 rounded-md hover:bg-slate-600 hover:text-white transition-colors duration-150"
+                    aria-label="Previous page"
+                >
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1">
+                        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+                    </svg>
+                    Previous
+                </button>
+            {% else %}
+                <span class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-500 bg-slate-800 border border-slate-700 rounded-md cursor-not-allowed">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-1">
+                        <path fill-rule="evenodd" d="M12.79 5.23a.75.75 0 01-.02 1.06L8.832 10l3.938 3.71a.75.75 0 11-1.04 1.08l-4.5-4.25a.75.75 0 010-1.08l4.5-4.25a.75.75 0 011.06.02z" clip-rule="evenodd" />
+                    </svg>
+                    Previous
+                </span>
+            {% endif %}
+
+            <!-- Page Numbers -->
+            <div class="flex items-center space-x-1">
+                {% set start_page = 1 if pagination.page - 2 < 1 else pagination.page - 2 %}
+                {% set end_page = pagination.total_pages if pagination.page + 2 > pagination.total_pages else pagination.page + 2 %}
+                
+                {% if start_page > 1 %}
+                    <button 
+                        hx-get="/files?page=1{{ pagination_query }}"
+                        hx-target="#media-grid"
+                        hx-swap="innerHTML"
+                        class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-300 bg-slate-700 border border-slate-600 rounded-md hover:bg-slate-600 hover:text-white transition-colors duration-150"
+                    >
+                        1
+                    </button>
+                    {% if start_page > 2 %}
+                        <span class="text-slate-500 px-2">...</span>
+                    {% endif %}
+                {% endif %}
+
+                {% for page_num in range(start_page, end_page + 1) %}
+                    {% if page_num == pagination.page %}
+                        <span class="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary border border-primary rounded-md">
+                            {{ page_num }}
+                        </span>
+                    {% else %}
+                        <button 
+                            hx-get="/files?page={{ page_num }}{{ pagination_query }}"
+                            hx-target="#media-grid"
+                            hx-swap="innerHTML"
+                            class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-300 bg-slate-700 border border-slate-600 rounded-md hover:bg-slate-600 hover:text-white transition-colors duration-150"
+                        >
+                            {{ page_num }}
+                        </button>
+                    {% endif %}
+                {% endfor %}
+
+                {% if end_page < pagination.total_pages %}
+                    {% if end_page < pagination.total_pages - 1 %}
+                        <span class="text-slate-500 px-2">...</span>
+                    {% endif %}
+                    <button 
+                        hx-get="/files?page={{ pagination.total_pages }}{{ pagination_query }}"
+                        hx-target="#media-grid"
+                        hx-swap="innerHTML"
+                        class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-300 bg-slate-700 border border-slate-600 rounded-md hover:bg-slate-600 hover:text-white transition-colors duration-150"
+                    >
+                        {{ pagination.total_pages }}
+                    </button>
+                {% endif %}
+            </div>
+
+            <!-- Next Page Button -->
+            {% if pagination.has_next %}
+                <button 
+                    hx-get="/files?page={{ pagination.next_page }}{{ pagination_query }}"
+                    hx-target="#media-grid"
+                    hx-swap="innerHTML"
+                    class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-300 bg-slate-700 border border-slate-600 rounded-md hover:bg-slate-600 hover:text-white transition-colors duration-150"
+                    aria-label="Next page"
+                >
+                    Next
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1">
+                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            {% else %}
+                <span class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-500 bg-slate-800 border border-slate-700 rounded-md cursor-not-allowed">
+                    Next
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1">
+                        <path fill-rule="evenodd" d="M7.21 14.77a.75.75 0 01.02-1.06L11.168 10 7.23 6.29a.75.75 0 111.04-1.08l4.5 4.25a.75.75 0 010 1.08l-4.5 4.25a.75.75 0 01-1.06-.02z" clip-rule="evenodd" />
+                    </svg>
+                </span>
+            {% endif %}
+        </nav>
+    </div>
+</div>
+{% endif %}
+
 {% else %}
 <div class="col-span-full text-center py-12">
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="w-16 h-16 mx-auto text-slate-500 mb-4">
@@ -91,26 +211,27 @@ function setupVideoPreviews() {
             return; // No preview for this card, or elements missing
         }
 
-        // Create video player once and preload metadata
+        // Create video player once and preload
         const videoPlayer = document.createElement('video');
         videoPlayer.src = previewUrl;
-        videoPlayer.preload = 'metadata'; // Preload metadata
+        videoPlayer.preload = 'auto'; // Changed from 'metadata' to 'auto' for faster hover playback
         videoPlayer.loop = true;
         videoPlayer.muted = true;
         videoPlayer.playsInline = true;
         videoPlayer.className = 'absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ease-in-out opacity-0'; // Start hidden
         previewContainer.appendChild(videoPlayer);
-        videoPlayer.load(); // Explicitly tell the browser to load metadata/initial data
+        videoPlayer.load(); // Explicitly tell the browser to load
 
         card.addEventListener('mouseenter', () => {
             // No timeout, attempt to play immediately
             if (thumbnailImg) thumbnailImg.style.opacity = '0'; // Hide thumbnail
             videoPlayer.style.opacity = '1'; // Show video
             videoPlayer.play().catch(error => {
-                // It's common for play() to be interrupted if the user mouses out quickly
-                // or if the video isn't ready. We can choose to log only more critical errors.
                 if (error.name !== 'AbortError') {
                     console.error("Error playing preview:", previewUrl, error);
+                    // If play fails for other reasons, hide video and show thumbnail again
+                    videoPlayer.style.opacity = '0';
+                    if (thumbnailImg) thumbnailImg.style.opacity = '1';
                 }
             });
         });
@@ -123,10 +244,27 @@ function setupVideoPreviews() {
     });
 }
 
-// Initial setup
-document.addEventListener('DOMContentLoaded', setupVideoPreviews);
+// Handle search input to reset pagination to page 1
+function handleSearchReset() {
+    const searchInput = document.getElementById('search-input');
+    if (searchInput) {
+        // Intercept search requests to ensure we start from page 1
+        searchInput.addEventListener('htmx:configRequest', function(event) {
+            // Reset to page 1 for any search
+            const url = new URL(event.detail.path, window.location.origin);
+            url.searchParams.set('page', '1');
+            event.detail.path = url.pathname + url.search;
+        });
+    }
+}
 
-// Re-run setup if HTMX swaps content (e.g., after search)
+// Initial setup
+document.addEventListener('DOMContentLoaded', function() {
+    setupVideoPreviews();
+    handleSearchReset();
+});
+
+// Re-run setup if HTMX swaps content (e.g., after search or pagination)
 document.body.addEventListener('htmx:afterSwap', function(event) {
     if (event.detail.target.id === 'media-grid' || event.detail.target.closest('#media-grid')) {
         setupVideoPreviews();

@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Media Browser</title>
     <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
     <script src="https://cdn.tailwindcss.com"></script>
     <script>
         tailwind.config = {
@@ -31,46 +32,233 @@
     </script>
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen font-sans">
-    <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700">
+    <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Main Navigation Bar -->
             <div class="flex justify-between items-center h-16">
-                <h1 class="text-2xl font-semibold text-white">Media Browser</h1>
-                <div class="flex items-center space-x-6">
-                    <div class="flex items-center space-x-2">
-                        <label for="grid-size-selector" class="text-xs text-slate-400 whitespace-nowrap">Grid Size:</label>
-                        <select id="grid-size-selector" 
-                                name="grid_size"
-                                class="text-xs bg-slate-700 border border-slate-600 text-slate-200 rounded px-2 py-1 focus:outline-none focus:ring-1 focus:ring-primary"
-                                hx-post="/settings/grid-size"
-                                hx-trigger="change"
-                                hx-on::after-request="window.location.reload()">
-                            <option value="small" {% if grid_size == 'small' %}selected{% endif %}>Small</option>
-                            <option value="medium" {% if grid_size == 'medium' %}selected{% endif %}>Medium</option>
-                            <option value="large" {% if grid_size == 'large' %}selected{% endif %}>Large</option>
-                        </select>
-                    </div>
-                    <a href="{{ url_for('thumbnail_tools_page') }}" 
-                       class="text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 whitespace-nowrap">
-                        Media Processing Tools
+                <!-- Brand/Logo -->
+                <div class="flex-shrink-0">
+                    <a href="/" class="text-xl font-bold text-white hover:text-primary transition-colors duration-200 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 mr-2 text-primary">
+                            <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z"/>
+                        </svg>
+                        Media Browser
                     </a>
-                    <a href="{{ url_for('settings_page') }}" 
-                       class="text-sm font-medium text-slate-400 hover:text-slate-300 transition-colors duration-150 whitespace-nowrap">
-                        Settings
-                    </a>
-                    <div class="relative w-80 lg:w-96">
+                </div>
+
+                <!-- Center Search Section -->
+                <div class="flex-1 max-w-2xl mx-6 relative">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-400">
+                                <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11ZM2 9a7 7 0 1 1 12.452 4.391l3.328 3.329a.75.75 0 1 1-1.06 1.06l-3.329-3.328A7 7 0 0 1 2 9Z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
                         <input type="text" 
                                id="search-input" 
                                name="search" 
-                               placeholder="Search media..." 
-                               class="w-full pl-4 pr-10 py-2 rounded-full bg-slate-700 border border-slate-600 text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:border-primary transition-all duration-200 text-sm"
+                               placeholder="Search media files..." 
+                               class="block w-full pl-10 pr-20 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 text-sm backdrop-blur-sm"
                                hx-get="/files"
                                hx-trigger="keyup changed delay:500ms, search"
                                hx-target="#media-grid"
+                               hx-include="#advanced-search-form"
                                hx-indicator="#search-indicator">
-                        <div id="search-indicator" class="htmx-indicator absolute right-3 top-1/2 -translate-y-1/2">
-                            <div class="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
+                        
+                        <!-- Search Controls -->
+                        <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                            <div id="search-indicator" class="htmx-indicator mr-2">
+                                <div class="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
+                            </div>
+                            <button type="button" 
+                                    id="advanced-search-toggle"
+                                    class="p-1.5 text-slate-400 hover:text-primary transition-colors duration-200 rounded-md hover:bg-slate-600/50 flex items-center space-x-1"
+                                    title="Advanced Search Options">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                                    <path fill-rule="evenodd" d="M2.628 1.601C5.028 1.206 7.49 1 10 1s4.973.206 7.372.601a.75.75 0 0 1 .628.74v2.288a2.25 2.25 0 0 1-.659 1.59l-4.682 4.683a2.25 2.25 0 0 0-.659 1.59v3.037c0 .684-.31 1.33-.844 1.757l-1.937 1.55A.75.75 0 0 1 8.25 17V12.25a2.25 2.25 0 0 0-.659-1.591L2.909 6.016A2.25 2.25 0 0 1 2.25 4.426V2.14a.75.75 0 0 1 .378-.54Z" clip-rule="evenodd" />
+                                </svg>
+                                <svg id="advanced-search-arrow" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 transform transition-transform duration-200">
+                                    <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
+                </div>
+
+                <!-- Right Navigation -->
+                <div class="flex items-center space-x-2">
+                    <!-- View Options -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" @click.away="open = false" 
+                                class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 border border-transparent hover:border-slate-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-2">
+                                <path fill-rule="evenodd" d="M4.25 2A2.25 2.25 0 002 4.25v2.5A2.25 2.25 0 004.25 9h2.5A2.25 2.25 0 009 6.75v-2.5A2.25 2.25 0 006.75 2h-2.5ZM2 13.25A2.25 2.25 0 014.25 11h2.5A2.25 2.25 0 019 13.25v2.5A2.25 2.25 0 016.75 18h-2.5A2.25 2.25 0 012 15.75v-2.5ZM11 4.25A2.25 2.25 0 0113.25 2h2.5A2.25 2.25 0 0118 4.25v2.5A2.25 2.25 0 0115.75 9h-2.5A2.25 2.25 0 0111 6.75v-2.5ZM13.25 11A2.25 2.25 0 0011 13.25v2.5A2.25 2.25 0 0013.25 18h2.5A2.25 2.25 0 0018 15.75v-2.5A2.25 2.25 0 0015.75 11h-2.5Z" clip-rule="evenodd" />
+                            </svg>
+                            View
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1 opacity-70">
+                                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-2 z-20 backdrop-blur-sm">
+                            <div class="px-4 py-3 border-b border-slate-700">
+                                <h3 class="text-sm font-semibold text-slate-200 mb-2">Display Options</h3>
+                                <div class="space-y-3">
+                                    <div>
+                                        <label for="grid-size-selector" class="block text-xs font-medium text-slate-400 mb-1">Grid Size</label>
+                                        <select id="grid-size-selector" 
+                                                name="grid_size"
+                                                class="w-full text-sm bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50"
+                                                hx-post="/settings/grid-size"
+                                                hx-trigger="change"
+                                                hx-on:htmx:after-request="window.location.reload()">
+                                            <option value="small" {% if grid_size == 'small' %}selected{% endif %}>Small</option>
+                                            <option value="medium" {% if grid_size == 'medium' %}selected{% endif %}>Medium</option>
+                                            <option value="large" {% if grid_size == 'large' %}selected{% endif %}>Large</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label for="per-page-selector" class="block text-xs font-medium text-slate-400 mb-1">Items per Page</label>
+                                        <select id="per-page-selector" 
+                                                name="per_page"
+                                                class="w-full text-sm bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50">
+                                            <option value="10" {% if per_page == '10' %}selected{% endif %}>10</option>
+                                            <option value="20" {% if per_page == '20' %}selected{% endif %}>20</option>
+                                            <option value="30" {% if per_page == '30' %}selected{% endif %}>30</option>
+                                            <option value="50" {% if per_page == '50' %}selected{% endif %}>50</option>
+                                            <option value="100" {% if per_page == '100' %}selected{% endif %}>100</option>
+                                        </select>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Tools Menu -->
+                    <div class="relative" x-data="{ open: false }">
+                        <button @click="open = !open" @click.away="open = false" 
+                                class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 border border-transparent hover:border-slate-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-2">
+                                <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
+                            </svg>
+                            Tools
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1 opacity-70">
+                                <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
+                        <div x-show="open" x-transition:enter="transition ease-out duration-200" x-transition:enter-start="opacity-0 scale-95" x-transition:enter-end="opacity-100 scale-100" x-transition:leave="transition ease-in duration-150" x-transition:leave-start="opacity-100 scale-100" x-transition:leave-end="opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-20 backdrop-blur-sm">
+                            <a href="{{ url_for('thumbnail_tools_page') }}" 
+                               class="flex items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-3 text-slate-400">
+                                    <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 0 1 3.25 3h13.5A2.25 2.25 0 0 1 19 5.25v9.5A2.25 2.25 0 0 1 16.75 17H3.25A2.25 2.25 0 0 1 1 14.75v-9.5Zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 0 0 .75-.75v-2.69l-2.22-2.219a.75.75 0 0 0-1.06 0l-1.91 1.909.47.47a.75.75 0 1 1-1.06 1.06L6.53 8.091a.75.75 0 0 0-1.06 0l-2.97 2.97ZM12 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" clip-rule="evenodd" />
+                                </svg>
+                                Media Processing
+                            </a>
+                            <a href="{{ url_for('background_jobs_page') }}" 
+                               class="flex items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-3 text-slate-400">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.236 4.53L8.107 10.5a.75.75 0 0 0-1.214 1.007l1.643 2.25a.75.75 0 0 0 1.214-.007l3.857-5.557Z" clip-rule="evenodd" />
+                                </svg>
+                                Background Jobs
+                            </a>
+                        </div>
+                    </div>
+                    
+                    <!-- Settings -->
+                    <a href="{{ url_for('settings_page') }}" 
+                       class="inline-flex items-center p-2 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 border border-transparent hover:border-slate-600"
+                       title="Settings">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                            <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
+                        </svg>
+                    </a>
+                </div>
+            </div>
+        </div>
+        
+        <!-- Advanced Search Panel -->
+        <div id="advanced-search-panel" 
+             class="hidden border-t border-slate-700 bg-slate-800/95 backdrop-blur-sm">
+            <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <form id="advanced-search-form" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
+                    <!-- Media Type Filter -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-2">Media Type</label>
+                        <select name="media_type" id="media-type-filter"
+                                class="w-full text-sm bg-slate-700/50 border border-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm">
+                            <option value="">All Types</option>
+                            <option value="video">Videos</option>
+                            <option value="audio">Audio</option>
+                            <option value="image">Images</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Tags Filter -->
+                    <div class="relative lg:col-span-2">
+                        <label class="block text-xs font-medium text-slate-400 mb-2">Tags</label>
+                        <input type="text" 
+                               name="tags" 
+                               id="tags-filter"
+                               placeholder="Enter tags (comma-separated)"
+                               class="w-full text-sm bg-slate-700/50 border border-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm"
+                               autocomplete="off">
+                        <div id="tags-suggestions" class="absolute mt-1 w-full bg-slate-700 border border-slate-600 rounded-md shadow-lg hidden z-40 max-h-32 overflow-y-auto backdrop-blur-sm"></div>
+                    </div>
+                    
+                    <!-- Sort By -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-2">Sort By</label>
+                        <select name="sort_by" id="sort-by-filter"
+                                class="w-full text-sm bg-slate-700/50 border border-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm">
+                            <option value="date_added">Date Added</option>
+                            <option value="filename">Filename</option>
+                            <option value="user_title">Title</option>
+                            <option value="duration">Duration</option>
+                            <option value="size_bytes">File Size</option>
+                            <option value="media_type">Media Type</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Sort Order -->
+                    <div>
+                        <label class="block text-xs font-medium text-slate-400 mb-2">Sort Order</label>
+                        <select name="sort_order" id="sort-order-filter"
+                                class="w-full text-sm bg-slate-700/50 border border-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary/50 backdrop-blur-sm">
+                            <option value="desc">Descending</option>
+                            <option value="asc">Ascending</option>
+                        </select>
+                    </div>
+                    
+                    <!-- Action Buttons -->
+                    <div class="flex items-end space-x-2 xl:col-start-6">
+                        <button type="button" 
+                                id="clear-filters-btn"
+                                class="w-full sm:w-auto px-3 py-2 text-xs text-slate-400 hover:text-red-400 hover:bg-red-400/10 rounded-md transition-colors duration-200 border border-transparent hover:border-red-400/30">
+                            Clear All
+                        </button>
+                        <button type="button" 
+                                id="apply-filters-btn"
+                                class="w-full sm:w-auto px-4 py-2 bg-primary text-white text-sm rounded-md hover:bg-primary/80 transition-colors duration-200 shadow-sm">
+                            Apply Filters
+                        </button>
+                    </div>
+                </form>
+                
+                <!-- Filter Status & Results -->
+                <div class="flex items-center justify-between mt-3 pt-3 border-t border-slate-700/50">
+                    <span id="filter-status" class="text-xs text-slate-500 hidden flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3 mr-1">
+                            <path fill-rule="evenodd" d="M12.416 3.376a.75.75 0 0 1 .208 1.04l-5 7.5a.75.75 0 0 1-1.154.114l-3-3a.75.75 0 0 1 1.06-1.06l2.353 2.353 4.493-6.74a.75.75 0 0 1 1.04-.207Z" clip-rule="evenodd" />
+                        </svg>
+                        <span id="filter-status-text">Filters auto-saved</span>
+                    </span>
+                    <span id="active-filters-summary" class="text-xs text-slate-400">
+                        <!-- Summary of active filters will be injected here by JS -->
+                    </span>
+                    <span id="results-count-summary" class="text-xs text-slate-400">
+                        <!-- Total results count will be updated here -->
+                    </span>
                 </div>
             </div>
         </div>
@@ -79,10 +267,451 @@
         <div id="media-grid" 
              class="grid {% if grid_size == 'small' %}grid-cols-1 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 xl:grid-cols-8 gap-3 lg:gap-4{% elif grid_size == 'large' %}grid-cols-1 sm:grid-cols-2 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6 lg:gap-8{% else %}grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-5 lg:gap-6{% endif %}"
              hx-get="/files" 
-             hx-trigger="load, every 60s"
+             hx-trigger="load_initial_media"
              hx-swap="innerHTML"
-             hx-include="#search-input">
+             hx-include="#search-input, #per-page-selector, #media-type-filter, #tags-filter, #sort-by-filter, #sort-order-filter">
         </div>
     </main>
+    <script>
+        // Per-page setting persistence with localStorage backup
+        document.addEventListener('DOMContentLoaded', function() {
+            const perPageSelector = document.getElementById('per-page-selector');
+            const mediaGrid = document.getElementById('media-grid');
+            const searchInput = document.getElementById('search-input');
+            
+            // If no server-side setting and localStorage has a value, use it
+            const storedPerPage = localStorage.getItem('pabt_per_page');
+            if (storedPerPage && !perPageSelector.value && ['10', '20', '30', '50', '100'].includes(storedPerPage)) {
+                perPageSelector.value = storedPerPage;
+                // Trigger change to load content with stored setting
+                perPageSelector.dispatchEvent(new Event('change'));
+            }
+            
+            // Handle per-page selector changes
+            perPageSelector.addEventListener('change', function() {
+                const selectedValue = this.value;
+                
+                // Save to localStorage
+                localStorage.setItem('pabt_per_page', selectedValue);
+                
+                // Save to database
+                const formData = new FormData();
+                formData.append('per_page', selectedValue);
+                fetch('/settings/per-page', {
+                    method: 'POST',
+                    body: formData
+                }).then(response => {
+                    if (response.ok) {
+                        console.log('Per-page setting saved to database');
+                    }
+                }).catch(error => {
+                    console.error('Failed to save per-page setting:', error);
+                });
+                
+                // Update media grid content with current filters
+                updateMediaGrid();
+            });
+        });
+
+        // Advanced Search Functionality
+        document.addEventListener('DOMContentLoaded', function() {
+            const advancedSearchToggle = document.getElementById('advanced-search-toggle');
+            const advancedSearchPanel = document.getElementById('advanced-search-panel');
+            const advancedSearchArrow = document.getElementById('advanced-search-arrow');
+            const searchInput = document.getElementById('search-input');
+            const mediaGrid = document.getElementById('media-grid');
+            
+            // Advanced search form elements
+            const mediaTypeFilter = document.getElementById('media-type-filter');
+            const tagsFilter = document.getElementById('tags-filter');
+            const sortByFilter = document.getElementById('sort-by-filter');
+            const sortOrderFilter = document.getElementById('sort-order-filter');
+            const clearFiltersBtn = document.getElementById('clear-filters-btn');
+            const applyFiltersBtn = document.getElementById('apply-filters-btn');
+            const tagsSuggestions = document.getElementById('tags-suggestions');
+            const filterStatus = document.getElementById('filter-status');
+            const activeFiltersSummary = document.getElementById('active-filters-summary');
+            const resultsCountSummary = document.getElementById('results-count-summary');
+            
+            let availableTags = [];
+            
+            // Load available tags for autocomplete
+            fetch('/api/tags')
+                .then(response => response.json())
+                .then(data => {
+                    availableTags = data.tags || [];
+                })
+                .catch(error => {
+                    console.error('Failed to load tags:', error);
+                });
+            
+            // Filter persistence functions
+            function saveFilters() {
+                const filters = {
+                    search: searchInput.value || '',
+                    mediaType: mediaTypeFilter.value || '',
+                    tags: tagsFilter.value || '',
+                    sortBy: sortByFilter.value || 'date_added',
+                    sortOrder: sortOrderFilter.value || 'desc'
+                };
+                localStorage.setItem('pabt_search_filters', JSON.stringify(filters));
+                console.log('Filters saved:', filters);
+                
+                // Show visual feedback
+                if (hasActiveFilters()) {
+                    showFilterStatus('Filters auto-saved', 'saved');
+                }
+            }
+            
+            function showFilterStatus(message, type = 'saved') {
+                if (!filterStatus) return;
+                
+                const filterStatusText = document.getElementById('filter-status-text');
+                if (filterStatusText) {
+                    filterStatusText.textContent = message;
+                }
+                
+                filterStatus.classList.remove('hidden', 'text-slate-500', 'text-green-500', 'text-red-400');
+                
+                if (type === 'saved') {
+                    filterStatus.classList.add('text-green-500');
+                } else if (type === 'cleared') {
+                    filterStatus.classList.add('text-red-400');
+                } else {
+                    filterStatus.classList.add('text-slate-500');
+                }
+                
+                filterStatus.classList.remove('hidden');
+                
+                // Hide after 2 seconds
+                setTimeout(() => {
+                    filterStatus.classList.add('hidden');
+                }, 2000);
+            }
+            
+            function loadSavedFilters() {
+                try {
+                    const savedFilters = localStorage.getItem('pabt_search_filters');
+                    if (savedFilters) {
+                        const filters = JSON.parse(savedFilters);
+                        searchInput.value = filters.search || '';
+                        mediaTypeFilter.value = filters.mediaType || '';
+                        tagsFilter.value = filters.tags || '';
+                        sortByFilter.value = filters.sortBy || 'date_added';
+                        sortOrderFilter.value = filters.sortOrder || 'desc';
+                        console.log('Filters restored:', filters);
+                        return filters;
+                    }
+                } catch (error) {
+                    console.error('Error loading saved filters:', error);
+                }
+                return null;
+            }
+            
+            function clearSavedFilters() {
+                localStorage.removeItem('pabt_search_filters');
+                console.log('Saved filters cleared');
+            }
+            
+            function hasActiveFilters() {
+                return searchInput.value || 
+                       mediaTypeFilter.value || 
+                       tagsFilter.value || 
+                       sortByFilter.value !== 'date_added' || 
+                       sortOrderFilter.value !== 'desc';
+            }
+            
+            function updateClearButtonState() {
+                if (hasActiveFilters()) {
+                    clearFiltersBtn.classList.remove('text-slate-400');
+                    clearFiltersBtn.classList.add('text-red-400');
+                    clearFiltersBtn.textContent = 'Clear All Filters';
+                } else {
+                    clearFiltersBtn.classList.remove('text-red-400');
+                    clearFiltersBtn.classList.add('text-slate-400');
+                    clearFiltersBtn.textContent = 'No Active Filters';
+                }
+                updateActiveFiltersSummary();
+            }
+            
+            function updateAdvancedSearchToggle() {
+                // Add visual indicator to the advanced search toggle button when filters are active
+                if (hasActiveFilters()) {
+                    advancedSearchToggle.classList.add('text-primary', 'bg-primary/10', 'border-primary/30');
+                    advancedSearchToggle.classList.remove('text-slate-400');
+                } else {
+                    advancedSearchToggle.classList.remove('text-primary', 'bg-primary/10', 'border-primary/30');
+                    advancedSearchToggle.classList.add('text-slate-400');
+                }
+            }
+            
+            function updateActiveFiltersSummary() {
+                if (!activeFiltersSummary) return;
+                let summaryParts = [];
+                if (searchInput.value) summaryParts.push(`Search: "${searchInput.value}"`);
+                if (mediaTypeFilter.value) summaryParts.push(`Type: ${mediaTypeFilter.options[mediaTypeFilter.selectedIndex].text}`);
+                if (tagsFilter.value) summaryParts.push(`Tags: ${tagsFilter.value}`);
+                if (sortByFilter.value !== 'date_added' || sortOrderFilter.value !== 'desc') {
+                    summaryParts.push(`Sort: ${sortByFilter.options[sortByFilter.selectedIndex].text} ${sortOrderFilter.options[sortOrderFilter.selectedIndex].text}`);
+                }
+
+                if (summaryParts.length > 0) {
+                    activeFiltersSummary.innerHTML = `Active: ${summaryParts.join(', <span class="text-slate-500">|</span> ')}`;
+                    activeFiltersSummary.classList.remove('hidden');
+                } else {
+                    activeFiltersSummary.innerHTML = 'No active filters'; 
+                    // activeFiltersSummary.classList.add('hidden'); // Or keep it visible with a default message
+                }
+            }
+            
+            // Load saved filters on page load
+            const savedFilters = loadSavedFilters();
+            updateClearButtonState();
+            
+            // Show indicator in advanced search toggle if there are saved filters
+            if (savedFilters && (savedFilters.search || savedFilters.mediaType || savedFilters.tags || 
+                savedFilters.sortBy !== 'date_added' || savedFilters.sortOrder !== 'desc')) {
+                showFilterStatus('Filters restored from previous session', 'saved');
+                updateAdvancedSearchToggle();
+            }
+            
+            // Toggle advanced search panel
+            advancedSearchToggle.addEventListener('click', function() {
+                const isHidden = advancedSearchPanel.classList.contains('hidden');
+                if (isHidden) {
+                    advancedSearchPanel.classList.remove('hidden');
+                    advancedSearchArrow.style.transform = 'rotate(180deg)';
+                } else {
+                    advancedSearchPanel.classList.add('hidden');
+                    advancedSearchArrow.style.transform = 'rotate(0deg)';
+                }
+            });
+            
+            // Close advanced search panel when clicking outside
+            document.addEventListener('click', function(event) {
+                if (!advancedSearchToggle.contains(event.target) && 
+                    !advancedSearchPanel.contains(event.target)) {
+                    advancedSearchPanel.classList.add('hidden');
+                    advancedSearchArrow.style.transform = 'rotate(0deg)';
+                }
+            });
+            
+            // Tag autocomplete functionality
+            tagsFilter.addEventListener('input', function() {
+                const inputValue = this.value;
+                const lastComma = inputValue.lastIndexOf(',');
+                const currentTag = lastComma >= 0 ? inputValue.substring(lastComma + 1).trim() : inputValue.trim();
+                
+                if (currentTag.length > 0) {
+                    const matchingTags = availableTags.filter(tag => 
+                        tag.toLowerCase().includes(currentTag.toLowerCase())
+                    );
+                    
+                    if (matchingTags.length > 0) {
+                        tagsSuggestions.innerHTML = matchingTags
+                            .slice(0, 10) // Limit to 10 suggestions
+                            .map(tag => `
+                                <div class="px-3 py-2 hover:bg-slate-600 cursor-pointer text-xs" 
+                                     data-tag="${tag}">
+                                    ${tag}
+                                </div>
+                            `).join('');
+                        tagsSuggestions.classList.remove('hidden');
+                    } else {
+                        tagsSuggestions.classList.add('hidden');
+                    }
+                } else {
+                    tagsSuggestions.classList.add('hidden');
+                }
+            });
+            
+            // Handle tag suggestion clicks
+            tagsSuggestions.addEventListener('click', function(event) {
+                const tagElement = event.target.closest('[data-tag]');
+                if (tagElement) {
+                    const selectedTag = tagElement.getAttribute('data-tag');
+                    const currentValue = tagsFilter.value;
+                    const lastComma = currentValue.lastIndexOf(',');
+                    
+                    if (lastComma >= 0) {
+                        // Replace the current tag being typed
+                        tagsFilter.value = currentValue.substring(0, lastComma + 1) + ' ' + selectedTag;
+                    } else {
+                        // Replace entire input
+                        tagsFilter.value = selectedTag;
+                    }
+                    
+                    tagsSuggestions.classList.add('hidden');
+                    tagsFilter.focus();
+                    
+                    // Save filters and update immediately
+                    saveFilters();
+                    updateClearButtonState();
+                    updateAdvancedSearchToggle();
+                }
+            });
+            
+            // Hide suggestions when tags input loses focus (with delay for click handling)
+            tagsFilter.addEventListener('blur', function() {
+                setTimeout(() => {
+                    tagsSuggestions.classList.add('hidden');
+                }, 200);
+            });
+            
+            // Update media grid function
+            function updateMediaGrid() {
+                const searchQuery = searchInput.value || '';
+                const mediaType = mediaTypeFilter.value || '';
+                const tags = tagsFilter.value || '';
+                const sortBy = sortByFilter.value || 'date_added';
+                const sortOrder = sortOrderFilter.value || 'desc';
+                const perPage = document.getElementById('per-page-selector').value;
+                
+                const params = new URLSearchParams({
+                    page: '1', // Reset to first page when applying filters
+                    per_page: perPage
+                });
+                
+                if (searchQuery) params.append('search', searchQuery);
+                if (mediaType) params.append('media_type', mediaType);
+                if (tags) params.append('tags', tags);
+                if (sortBy) params.append('sort_by', sortBy);
+                if (sortOrder) params.append('sort_order', sortOrder);
+                
+                const url = `/files?${params.toString()}`;
+                
+                fetch(url)
+                    .then(response => response.text())
+                    .then(html => {
+                        mediaGrid.innerHTML = html;
+                        htmx.process(mediaGrid);
+                        mediaGrid.dispatchEvent(new CustomEvent('htmx:afterSwap', {
+                            detail: { target: mediaGrid }
+                        }));
+                        
+                        // Update results count summary
+                        const resultsCountElement = mediaGrid.querySelector('[data-total-count]');
+                        if (resultsCountSummary && resultsCountElement) {
+                            const totalCount = resultsCountElement.dataset.totalCount;
+                            resultsCountSummary.textContent = totalCount ? `${totalCount} results` : '';
+                        } else if (resultsCountSummary) {
+                            resultsCountSummary.textContent = ''; // Clear if no count available
+                        }
+                        
+                        // Save filters after successful update
+                        saveFilters();
+                        updateClearButtonState();
+                        updateAdvancedSearchToggle();
+                    })
+                    .catch(error => {
+                        console.error('Failed to update media grid:', error);
+                    });
+            }
+            
+            // Apply filters button
+            applyFiltersBtn.addEventListener('click', function() {
+                updateMediaGrid();
+                advancedSearchPanel.classList.add('hidden');
+                advancedSearchArrow.style.transform = 'rotate(0deg)';
+            });
+            
+            // Clear filters button
+            clearFiltersBtn.addEventListener('click', function() {
+                if (hasActiveFilters()) {
+                    // Clear form fields
+                    searchInput.value = '';
+                    mediaTypeFilter.value = '';
+                    tagsFilter.value = '';
+                    sortByFilter.value = 'date_added';
+                    sortOrderFilter.value = 'desc';
+                    
+                    // Clear saved filters
+                    clearSavedFilters();
+                    
+                    // Update grid and UI
+                    updateMediaGrid();
+                    updateClearButtonState();
+                    updateAdvancedSearchToggle();
+                    
+                    // Show confirmation
+                    showFilterStatus('Filters Cleared!', 'cleared');
+                }
+            });
+            
+            // Auto-apply filters on change (with debounce)
+            let filterTimeout;
+            function debounceFilter() {
+                clearTimeout(filterTimeout);
+                filterTimeout = setTimeout(() => {
+                    updateMediaGrid();
+                }, 500);
+            }
+            
+            // Add input event listeners to save filters
+            searchInput.addEventListener('input', () => {
+                saveFilters();
+                updateClearButtonState();
+                updateAdvancedSearchToggle();
+            });
+            
+            mediaTypeFilter.addEventListener('change', () => {
+                saveFilters();
+                updateClearButtonState();
+                updateAdvancedSearchToggle();
+                debounceFilter();
+            });
+            
+            tagsFilter.addEventListener('input', () => {
+                saveFilters();
+                updateClearButtonState();
+                updateAdvancedSearchToggle();
+            });
+            
+            sortByFilter.addEventListener('change', () => {
+                saveFilters();
+                updateClearButtonState();
+                updateAdvancedSearchToggle();
+                debounceFilter();
+            });
+            
+            sortOrderFilter.addEventListener('change', () => {
+                saveFilters();
+                updateClearButtonState();
+                updateAdvancedSearchToggle();
+                debounceFilter();
+            });
+            
+            // Tags filter with enter key support
+            tagsFilter.addEventListener('keydown', function(event) {
+                if (event.key === 'Enter') {
+                    event.preventDefault();
+                    updateMediaGrid();
+                    advancedSearchPanel.classList.add('hidden');
+                    advancedSearchArrow.style.transform = 'rotate(0deg)';
+                }
+            });
+            
+            // Load content with saved filters if any exist
+            if (savedFilters && (savedFilters.search || savedFilters.mediaType || savedFilters.tags || 
+                savedFilters.sortBy !== 'date_added' || savedFilters.sortOrder !== 'desc')) {
+                // Delay to ensure other components are ready
+                setTimeout(() => {
+                    updateMediaGrid(); 
+                }, 100);
+            } else {
+                 // If no saved filters, ensure summary is also clear or shows default
+                updateActiveFiltersSummary();
+                 if(resultsCountSummary) resultsCountSummary.textContent = '';
+            }
+        });
+
+        // Dispatch custom event to load initial media grid content
+        document.addEventListener('DOMContentLoaded', function() {
+            const mediaGrid = document.getElementById('media-grid');
+            if (mediaGrid) {
+                mediaGrid.dispatchEvent(new CustomEvent('load_initial_media'));
+            }
+        });
+    </script>
 </body>
 </html> 

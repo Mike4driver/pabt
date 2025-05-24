@@ -34,7 +34,7 @@
                       hx-target="#video-metadata-sidebar" {# Target the whole sidebar for now to refresh display and form #}
                       hx-swap="outerHTML" {# Replace the entire sidebar, which will re-render it in display mode #}
                       hx-indicator="#metadata-save-spinner"
-                      hx-on::after-request="handleMetadataUpdateResponse(event)"
+                      hx-on:htmx:after-request="handleMetadataUpdateResponse(event)"
                       >
                     <div>
                         <label for="user_title" class="block text-sm font-medium text-slate-300 mb-1">Custom Title</label>
@@ -84,6 +84,29 @@
                 </div>
                 
                 <div class="mt-8 space-y-4">
+                    {% if error_message %}
+                    <div class="p-3 mb-3 bg-red-700/30 border border-red-600/50 text-red-300 text-sm rounded-md" role="alert">
+                        <p class="font-semibold">Operation Note:</p>
+                        <p>{{ error_message }}</p>
+                    </div>
+                    {% endif %}
+
+                    <!-- Background Job Status Section for Video Sidebar -->
+                    <div id="video-background-jobs" class="hidden">
+                        <div class="bg-slate-700/50 p-4 rounded-lg border border-slate-600 mb-4">
+                            <div class="flex items-center justify-between mb-2">
+                                <h3 class="text-sm font-semibold text-slate-100 flex items-center">
+                                    <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2"></div>
+                                    Background Operations
+                                </h3>
+                                <button onclick="hideVideoJobs()" class="text-xs text-slate-400 hover:text-slate-300">✕</button>
+                            </div>
+                            <div id="video-jobs-container" class="space-y-2">
+                                <!-- Jobs will be inserted here -->
+                            </div>
+                        </div>
+                    </div>
+
                     <a href="{{ video.original_path_for_download }}" download class="w-full bg-primary text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2">
                             <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
@@ -96,17 +119,20 @@
                     <button 
                         hx-post="{{ url_for('generate_specific_thumbnail_endpoint', video_name=video.name) }}"
                         hx-indicator="#thumbnail-spinner-{{ video.name | slugify_for_id }}"
-                        hx-on::after-request="
-                            let player = document.getElementById('main-video-player');
-                            let newPosterUrl = event.detail.xhr.getResponseHeader('X-Thumbnail-Url');
-                            if (newPosterUrl) {
-                                player.poster = newPosterUrl;
-                                this.remove(); // Remove button after success
+                        hx-target="#video-metadata-sidebar" 
+                        hx-swap="outerHTML"
+                        hx-on:htmx:after-request="
+                            if (event.detail.successful && event.detail.xhr.getResponseHeader('X-Thumbnail-Url')) {
+                                let player = document.getElementById('main-video-player');
+                                if (player) { 
+                                    let newPosterUrl = event.detail.xhr.getResponseHeader('X-Thumbnail-Url');
+                                    player.poster = newPosterUrl;
+                                }
+                                console.log('Thumbnail generated, sidebar reloaded, poster updated.');
+                            } else if (!event.detail.successful) {
+                                console.error('Thumbnail generation failed or X-Thumbnail-Url header missing.');
                                 let statusDiv = document.getElementById('thumbnail-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class=\"text-green-400 text-xs mt-2\">Thumbnail generated and updated!</p>';
-                            } else {
-                                let statusDiv = document.getElementById('thumbnail-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class=\"text-red-400 text-xs mt-2\">Failed to get thumbnail URL from response.</p>';
+                                if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-2&quot;>Failed to get thumbnail URL from response. Sidebar did not reload.</p>';
                             }
                         "
                         class="w-full bg-amber-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-amber-500 focus:outline-none focus:ring-2 focus:ring-amber-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
@@ -114,39 +140,89 @@
                         Generate Thumbnail
                     </button>
                     <div id="thumbnail-status-message-{{ video.name | slugify_for_id }}"></div>
+                    {% else %}
+                    {# This block executes if video.has_specific_thumbnail is true #}
+                    <div class="mt-1">
+                        <p class="text-xs text-green-400 mb-1">A custom thumbnail is set.</p>
+                        <button 
+                            hx-post="{{ url_for('delete_specific_thumbnail_endpoint', video_name=video.name) }}"
+                            hx-indicator="#thumbnail-delete-spinner-{{ video.name | slugify_for_id }}"
+                            hx-target="#video-metadata-sidebar" 
+                            hx-swap="outerHTML"
+                            hx-confirm="Are you sure you want to delete the custom thumbnail for this video? The default (first frame) will be used."
+                            hx-on:htmx:after-request="
+                                if (event.detail.successful) {
+                                    let player = document.getElementById('main-video-player');
+                                    if (player) { 
+                                        player.poster = '{{ url_for("static", path="icons/generic-video-icon.svg") }}'; // Set to generic icon
+                                    }
+                                    console.log('Thumbnail deleted, sidebar reloaded, poster updated to default generic icon.');
+                                } else {
+                                     console.error('Thumbnail deletion failed.');
+                                     let statusDiv = document.getElementById('thumbnail-delete-status-{{ video.name | slugify_for_id }}');
+                                     if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete thumbnail. Sidebar did not reload.</p>';
+                                }
+                            "
+                            class="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                            <span id="thumbnail-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                            Delete Thumbnail
+                        </button>
+                        <div id="thumbnail-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
+                    </div>
                     {% endif %}
 
                     {% if video.type == 'video' and not video.has_transcoded_version %}
                     <button 
                         hx-post="{{ url_for('transcode_specific_video_endpoint', video_name=video.name) }}"
                         hx-indicator="#transcode-spinner-{{ video.name | slugify_for_id }}"
-                        hx-on::after-request="
-                            // Trigger a page refresh after transcoding request to update the button visibility
-                            window.location.reload();
-                        "
+                        hx-target="#transcode-status-message-{{ video.name | slugify_for_id }}"
+                        hx-swap="innerHTML"
+                        hx-on:htmx:after-request="handleVideoJobStart(event)"
                         class="w-full bg-sky-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-sky-500 focus:outline-none focus:ring-2 focus:ring-sky-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
                         <span id="transcode-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
                         Create Web-Optimized Version (MP4)
                     </button>
-                    <div id="transcode-status-message-{{ video.name | slugify_for_id }}"></div>
+                    <div id="transcode-status-message-{{ video.name | slugify_for_id }}" class="text-xs mt-2"></div>
+                    {% elif video.type == 'video' and video.has_transcoded_version %}
+                    <div class="mt-1">
+                        <p class="text-xs text-green-400 mb-1">A web-optimized version exists.</p>
+                        <button 
+                            hx-post="{{ url_for('delete_specific_transcoded_version_endpoint', video_name=video.name) }}"
+                            hx-indicator="#transcode-delete-spinner-{{ video.name | slugify_for_id }}"
+                            hx-target="#video-metadata-sidebar" 
+                            hx-swap="outerHTML"
+                            hx-confirm="Are you sure you want to delete the web-optimized version of this video?"
+                            hx-on:htmx:after-request="
+                                if (!event.detail.successful) {
+                                    console.error('Transcoded version deletion failed.');
+                                    let statusDiv = document.getElementById('transcode-delete-status-{{ video.name | slugify_for_id }}');
+                                    if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete web-optimized version. Sidebar did not reload.</p>';
+                                } else {
+                                    console.log('Web-optimized version deleted, sidebar reloaded.');
+                                }
+                            "
+                            class="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                            <span id="transcode-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                            Delete Web-Optimized Version
+                        </button>
+                        <div id="transcode-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
+                    </div>
                     {% endif %}
 
                     {% if video.type == 'video' and not video.has_preview %}
                     <button 
                         hx-post="{{ url_for('generate_specific_preview_endpoint', video_name=video.name) }}"
                         hx-indicator="#preview-spinner-{{ video.name | slugify_for_id }}"
-                        hx-on::after-request="
-                            let newPreviewUrl = event.detail.xhr.getResponseHeader('X-Preview-Url');
-                            if (newPreviewUrl) {
-                                this.innerText = 'Preview Generated'; 
-                                this.disabled = true;
+                        hx-target="#video-metadata-sidebar" 
+                        hx-swap="outerHTML"
+                        hx-on:htmx:after-request="
+                            if (event.detail.successful && event.detail.xhr.getResponseHeader('X-Preview-Url')) {
+                                console.log('Preview generated, sidebar reloaded.');
+                                // UI for preview is usually in a media gallery, not directly on player, so no direct DOM update here beyond reload.
+                            } else if (!event.detail.successful) {
+                                console.error('Preview generation failed or X-Preview-Url header missing.');
                                 let statusDiv = document.getElementById('preview-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class=\"text-purple-400 text-xs mt-2\">Hover preview generated! It will be used in the media browser.</p>';
-                                // Optionally, update video.has_preview and video.preview_url if we were managing state here
-                            } else {
-                                this.innerText = 'Preview Generation Failed';
-                                let statusDiv = document.getElementById('preview-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class=\"text-red-400 text-xs mt-2\">Failed to generate preview. Check logs.</p>';
+                                if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-2&quot;>Failed to generate preview. Sidebar did not reload.</p>';
                             }
                         "
                         class="w-full bg-purple-600 text-white font-semibold py-2.5 px-5 rounded-lg hover:bg-purple-500 focus:outline-none focus:ring-2 focus:ring-purple-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
@@ -154,6 +230,30 @@
                         Generate Hover Preview (5s)
                     </button>
                     <div id="preview-status-message-{{ video.name | slugify_for_id }}"></div>
+                    {% elif video.type == 'video' and video.has_preview %}
+                    <div class="mt-1">
+                        <p class="text-xs text-green-400 mb-1">A hover preview (5s) exists.</p>
+                        <button 
+                            hx-post="{{ url_for('delete_specific_preview_endpoint', video_name=video.name) }}"
+                            hx-indicator="#preview-delete-spinner-{{ video.name | slugify_for_id }}"
+                            hx-target="#video-metadata-sidebar" 
+                            hx-swap="outerHTML"
+                            hx-confirm="Are you sure you want to delete the hover preview for this video?"
+                            hx-on:htmx:after-request="
+                                if (!event.detail.successful) {
+                                    console.error('Preview deletion failed.');
+                                    let statusDiv = document.getElementById('preview-delete-status-{{ video.name | slugify_for_id }}');
+                                    if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete preview. Sidebar did not reload.</p>';
+                                } else {
+                                    console.log('Preview deleted, sidebar reloaded.');
+                                }
+                            "
+                            class="w-full bg-red-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-red-500 focus:outline-none focus:ring-2 focus:ring-red-500/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                            <span id="preview-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                            Delete Hover Preview
+                        </button>
+                        <div id="preview-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
+                    </div>
                     {% endif %}
 
                     <!-- Advanced Transcoding Button -->
@@ -167,6 +267,57 @@
                         Advanced Transcoding Options
                     </button>
                     {% endif %}
+
+                    <!-- Delete Media File Button -->
+                    <div class="mt-6 pt-6 border-t border-slate-700">
+                        <button 
+                            hx-delete="{{ url_for('delete_media_file_endpoint', video_id_db=video.id_db) }}" {# Assuming video.id_db is available #}
+                            hx-indicator="#delete-media-spinner-{{ video.name | slugify_for_id }}"
+                            hx-confirm="DANGER ZONE! Are you absolutely sure you want to delete this media file and all its associated assets (thumbnail, preview, transcoded versions)? This action cannot be undone."
+                            hx-target="body" {# Target body to handle potential redirect #}
+                            hx-swap="innerHTML" {# Replace body content on redirect, or use htmx.redirect extension #}
+                            hx-on:htmx:after-request="
+                                if (event.detail.successful) {
+                                    // Check for a redirect header or specific response indicating success
+                                    if (event.detail.xhr.status === 200 && event.detail.xhr.getResponseHeader('HX-Redirect')) {
+                                        // HTMX will handle the redirect based on HX-Redirect header
+                                        console.log('Media file deletion successful, redirecting...');
+                                    } else if (event.detail.xhr.status === 200) {
+                                        // Fallback if HX-Redirect is not used, but success is indicated (e.g. by a simple 200 OK and message)
+                                        console.log('Media file deletion successful. Attempting to redirect manually if no HX-Redirect.');
+                                        window.location.href = '/'; // Manually redirect to home
+                                    } else {
+                                        // Handle cases where server returns 200 but not a redirect (should ideally not happen for a delete-and-redirect)
+                                        console.warn('Media file deletion reported success, but no redirect instruction received.');
+                                        let statusDiv = document.getElementById('delete-media-status-{{ video.name | slugify_for_id }}');
+                                        if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-green-400 text-xs mt-1&quot;>Deletion successful, but redirect failed. Please navigate manually.</p>';
+                                    }
+                                } else {
+                                    console.error('Media file deletion failed.', event.detail);
+                                    let statusDiv = document.getElementById('delete-media-status-{{ video.name | slugify_for_id }}');
+                                    if(statusDiv) {
+                                        let errorMessage = 'Failed to delete media file.';
+                                        if (event.detail.xhr && event.detail.xhr.responseText) {
+                                            try {
+                                                const errResponse = JSON.parse(event.detail.xhr.responseText);
+                                                if (errResponse.detail) errorMessage += ' Error: ' + errResponse.detail;
+                                            } catch (e) { /* Ignore if not JSON */ }
+                                        }
+                                        statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>' + errorMessage + '</p>';
+                                    } else {
+                                        alert('Failed to delete media file. Status container not found.');
+                                    }
+                                }
+                            "
+                            class="w-full bg-red-700 text-white font-bold py-2.5 px-5 rounded-lg hover:bg-red-600 focus:outline-none focus:ring-2 focus:ring-red-600/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200 flex items-center justify-center text-sm">
+                            <span id="delete-media-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2">
+                                <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75H4.75a.75.75 0 000 1.5H6V16.5a.75.75 0 00.75.75h6.5a.75.75 0 00.75-.75V5.25h1.25a.75.75 0 000-1.5H14A2.75 2.75 0 0011.25 1h-2.5zM10 4c.414 0 .75.336.75.75V15.5a.75.75 0 01-1.5 0V4.75A.75.75 0 0110 4zM8.25 5.25V15.5a.75.75 0 01-1.5 0V5.25a.75.75 0 011.5 0zm3.5 0V15.5a.75.75 0 01-1.5 0V5.25a.75.75 0 011.5 0z" clip-rule="evenodd" />
+                            </svg>
+                            Delete Media File
+                        </button>
+                        <div id="delete-media-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1 text-center"></div>
+                    </div>
                 </div>
             </div>
 </div> 
