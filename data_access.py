@@ -314,16 +314,21 @@ def get_single_video_details_from_db(video_filename: str):
         if not row: return None, [], None # Return None for video, empty queue, None for next video
 
         # Fetch all video files for the queue, ordered by filename
-        cursor.execute("SELECT id, filename, user_title FROM media_files WHERE media_type = 'video' ORDER BY filename ASC")
+        cursor.execute("SELECT id, filename, user_title, thumbnail_path, duration, has_specific_thumbnail FROM media_files WHERE media_type = 'video' ORDER BY filename ASC")
         all_videos_rows = cursor.fetchall()
 
     video_list = []
     current_video_index = -1
     for i, v_row in enumerate(all_videos_rows):
+        # Determine thumbnail for queue items
+        q_thumbnail_url = f"/{v_row['thumbnail_path'].replace('\\\\ ', '/')}" if v_row['has_specific_thumbnail'] and v_row['thumbnail_path'] else "/static/icons/generic-video-icon.svg"
+        
         video_list.append({
             "id_db": v_row['id'],
             "name": v_row['filename'],
-            "display_title": v_row['user_title'] if v_row['user_title'] else v_row['filename']
+            "display_title": v_row['user_title'] if v_row['user_title'] else v_row['filename'],
+            "thumbnail_url_or_generic": q_thumbnail_url, # Added for queue
+            "duration_formatted": format_media_duration(v_row['duration']) # Added for queue
         })
         if v_row['id'] == row['id']:
             current_video_index = i

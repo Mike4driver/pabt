@@ -1320,7 +1320,7 @@ async def update_video_metadata(video_id_db: int, request: Request, user_title: 
             fields_to_update["tags"] = json.dumps(parsed_tags)
 
         if not fields_to_update:
-            current_video_details = get_single_video_details_from_db(video_exists['filename'])
+            current_video_details, _, _ = get_single_video_details_from_db(video_exists['filename'])
             if not current_video_details: raise HTTPException(status_code=404, detail="Video details not found.")
             return templates.TemplateResponse("_video_metadata_sidebar.html", {"request": request, "video": current_video_details})
 
@@ -1331,8 +1331,50 @@ async def update_video_metadata(video_id_db: int, request: Request, user_title: 
             logger.info(f"Updated metadata for video ID {video_id_db}: {fields_to_update}")
         except sqlite3.Error as e: logger.error(f"DB error for video ID {video_id_db}: {e}"); raise HTTPException(status_code=500, detail="DB error.")
     
-    updated_video_details = get_single_video_details_from_db(video_exists['filename'])
+    updated_video_details, _, _ = get_single_video_details_from_db(video_exists['filename'])
     if not updated_video_details: raise HTTPException(status_code=404, detail="Video details not found post-update.")
+    return templates.TemplateResponse("_video_metadata_sidebar.html", {"request": request, "video": updated_video_details})
+
+@app.delete("/video/{video_id_db}/tag/{tag_name}")
+async def remove_video_tag(video_id_db: int, tag_name: str, request: Request):
+    """Remove a specific tag from a video"""
+    with db_connection() as conn:
+        cursor = conn.cursor()
+        cursor.execute("SELECT filename, tags FROM media_files WHERE id = ? AND media_type = 'video'", (video_id_db,))
+        video_exists = cursor.fetchone()
+        if not video_exists: 
+            raise HTTPException(status_code=404, detail="Video not found.")
+
+        # Parse current tags
+        current_tags_json = video_exists['tags'] or '[]'
+        try:
+            current_tags = json.loads(current_tags_json)
+        except json.JSONDecodeError:
+            current_tags = []
+
+        # Remove the specified tag (case-insensitive)
+        updated_tags = [tag for tag in current_tags if tag.lower() != tag_name.lower()]
+        
+        # If no change was made, just return current state
+        if len(updated_tags) == len(current_tags):
+            current_video_details, _, _ = get_single_video_details_from_db(video_exists['filename'])
+            if not current_video_details: 
+                raise HTTPException(status_code=404, detail="Video details not found.")
+            return templates.TemplateResponse("_video_metadata_sidebar.html", {"request": request, "video": current_video_details})
+
+        # Update database with new tags
+        try:
+            cursor.execute("UPDATE media_files SET tags = ?, last_scanned=CURRENT_TIMESTAMP WHERE id = ?", 
+                         (json.dumps(updated_tags), video_id_db))
+            logger.info(f"Removed tag '{tag_name}' from video ID {video_id_db}")
+        except sqlite3.Error as e: 
+            logger.error(f"DB error removing tag from video ID {video_id_db}: {e}")
+            raise HTTPException(status_code=500, detail="Database error.")
+    
+    # Return updated sidebar
+    updated_video_details, _, _ = get_single_video_details_from_db(video_exists['filename'])
+    if not updated_video_details: 
+        raise HTTPException(status_code=404, detail="Video details not found post-update.")
     return templates.TemplateResponse("_video_metadata_sidebar.html", {"request": request, "video": updated_video_details})
 
 @app.get("/video/{current_video_id_db}/next")

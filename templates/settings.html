@@ -32,36 +32,73 @@
     </script>
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen font-sans">
-    <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700">
+    <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700 shadow-lg">
         <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <!-- Main Navigation Bar -->
             <div class="flex justify-between items-center h-16">
-                <a href="/" class="text-xl lg:text-2xl font-semibold text-white hover:text-primary transition-colors duration-150">Media Browser</a>
-                <div class="flex items-center space-x-4">
-                    <!-- Tools Dropdown -->
+                <!-- Brand/Logo -->
+                <div class="flex-shrink-0">
+                    <a href="/" class="text-xl font-bold text-white hover:text-primary transition-colors duration-200 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 mr-2 text-primary">
+                            <path d="M4.5 6.375a4.125 4.125 0 1 1 8.25 0 4.125 4.125 0 0 1-8.25 0ZM14.25 8.625a3.375 3.375 0 1 1 6.75 0 3.375 3.375 0 0 1-6.75 0ZM1.5 19.125a7.125 7.125 0 0 1 14.25 0v.003l-.001.119a.75.75 0 0 1-.363.63 13.067 13.067 0 0 1-6.761 1.873c-2.472 0-4.786-.684-6.76-1.873a.75.75 0 0 1-.364-.63l-.001-.122ZM17.25 19.128l-.001.144a2.25 2.25 0 0 1-.233.96 10.088 10.088 0 0 0 5.06-1.01.75.75 0 0 0 .42-.643 4.875 4.875 0 0 0-6.957-4.611 8.586 8.586 0 0 1 1.71 5.157l.001.003Z"/>
+                        </svg>
+                        Media Browser
+                    </a>
+                </div>
+
+                <!-- Center - Page Title -->
+                <div class="flex-1 max-w-2xl mx-6 text-center">
+                    <div class="text-sm text-slate-400 font-medium">Page</div>
+                    <div class="text-slate-200 text-lg font-semibold">Application Settings</div>
+                </div>
+
+                <!-- Right Navigation -->
+                <div class="flex items-center space-x-2">
+                    <!-- Tools Menu -->
                     <div class="relative" x-data="{ open: false }">
-                        <button @click="open = !open" @click.away="open = false" class="flex items-center text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700">
-                           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1">
-                                <path fill-rule="evenodd" d="M2.843 3.913A.75.75 0 0 0 2.25 4.5v11a.75.75 0 0 0 .593.737l3.521.88a.75.75 0 0 0 .874-.468l1.408-3.755a.75.75 0 0 1 1.428-.001l1.407 3.755a.75.75 0 0 0 .875.468l3.52-.88a.75.75 0 0 0 .594-.737V4.5a.75.75 0 0 0-.594-.737l-3.52-.88a.75.75 0 0 0-.875.468L11.16 6.105a.75.75 0 0 1-1.428.001L8.325 2.355a.75.75 0 0 0-.874-.468l-3.521.88.002-.001ZM4.463 4.58L7.5 3.75v3.479l-2.514.63a.75.75 0 0 0-.522.715v4.065L4.463 15.42V4.58Zm11.074 10.84L12.5 16.25V8.802l2.515-.63a.75.75 0 0 0 .52-.715V4.58l3.038.761v10.84Z" clip-rule="evenodd" />
+                        <button @click="open = !open" 
+                                class="inline-flex items-center px-3 py-2 text-sm font-medium text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 border border-transparent hover:border-slate-600">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-2">
+                                <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
                             </svg>
                             Tools
                             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 ml-1 opacity-70">
                                 <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
                             </svg>
                         </button>
-                        <div x-show="open" x-transition 
-                             class="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-md shadow-lg py-1 z-20">
+                        <div x-show="open" 
+                             @click.away="open = false"
+                             x-transition:enter="transition ease-out duration-200" 
+                             x-transition:enter-start="opacity-0 scale-95" 
+                             x-transition:enter-end="opacity-100 scale-100" 
+                             x-transition:leave="transition ease-in duration-150" 
+                             x-transition:leave-start="opacity-100 scale-100" 
+                             x-transition:leave-end="opacity-0 scale-95"
+                             class="absolute right-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl py-1 z-20 backdrop-blur-sm">
                             <a href="{{ url_for('thumbnail_tools_page') }}" 
-                               class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-primary">Media Processing Tools</a>
+                               class="flex items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-3 text-slate-400">
+                                    <path fill-rule="evenodd" d="M1 5.25A2.25 2.25 0 0 1 3.25 3h13.5A2.25 2.25 0 0 1 19 5.25v9.5A2.25 2.25 0 0 1 16.75 17H3.25A2.25 2.25 0 0 1 1 14.75v-9.5Zm1.5 5.81v3.69c0 .414.336.75.75.75h13.5a.75.75 0 0 0 .75-.75v-2.69l-2.22-2.219a.75.75 0 0 0-1.06 0l-1.91 1.909.47.47a.75.75 0 1 1-1.06 1.06L6.53 8.091a.75.75 0 0 0-1.06 0l-2.97 2.97ZM12 7a1 1 0 1 1-2 0 1 1 0 0 1 2 0Z" clip-rule="evenodd" />
+                                </svg>
+                                Media Processing Tools
+                            </a>
                             <a href="{{ url_for('background_jobs_page') }}" 
-                               class="block px-4 py-2 text-sm text-slate-300 hover:bg-slate-700 hover:text-primary">Background Jobs</a>
+                               class="flex items-center px-4 py-3 text-sm text-slate-300 hover:bg-slate-700/50 hover:text-white transition-colors duration-200">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-3 text-slate-400">
+                                    <path fill-rule="evenodd" d="M10 18a8 8 0 1 0 0-16 8 8 0 0 0 0 16Zm3.857-9.809a.75.75 0 0 0-1.214-.882l-3.236 4.53L8.107 10.5a.75.75 0 0 0-1.214 1.007l1.643 2.25a.75.75 0 0 0 1.214-.007l3.857-5.557Z" clip-rule="evenodd" />
+                                </svg>
+                                Background Jobs
+                            </a>
                         </div>
                     </div>
-                     <button onclick="goBack()" class="flex items-center text-sm font-medium text-slate-300 hover:text-primary transition-colors duration-150 p-2 rounded-md hover:bg-slate-700">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-1">
-                            <path fill-rule="evenodd" d="M17 10a.75.75 0 0 1-.75.75H5.56l2.72 2.72a.75.75 0 1 1-1.06 1.06l-4.25-4.25a.75.75 0 0 1 0-1.06l4.25-4.25a.75.75 0 0 1 1.06 1.06L5.56 9.25H16.25A.75.75 0 0 1 17 10Z" clip-rule="evenodd" />
+
+                    <!-- Current Page Indicator (Settings) -->
+                    <div class="px-3 py-2 text-sm font-medium text-primary bg-primary/10 rounded-lg border border-primary/30">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-2 inline">
+                            <path fill-rule="evenodd" d="M7.84 1.804A1 1 0 0 1 8.82 1h2.36a1 1 0 0 1 .98.804l.331 1.652a6.993 6.993 0 0 1 1.929 1.115l1.598-.54a1 1 0 0 1 1.186.447l1.18 2.044a1 1 0 0 1-.205 1.251l-1.267 1.113a7.047 7.047 0 0 1 0 2.228l1.267 1.113a1 1 0 0 1 .206 1.25l-1.18 2.045a1 1 0 0 1-1.187.447l-1.598-.54a6.993 6.993 0 0 1-1.929 1.115l-.33 1.652a1 1 0 0 1-.98.804H8.82a1 1 0 0 1-.98-.804l-.331-1.652a6.993 6.993 0 0 1-1.929-1.115l-1.598.54a1 1 0 0 1-1.186-.447l-1.18-2.044a1 1 0 0 1 .205-1.251l1.267-1.114a7.05 7.05 0 0 1 0-2.227L1.821 7.773a1 1 0 0 1-.206-1.25l1.18-2.045a1 1 0 0 1 1.187-.447l1.598.54A6.992 6.992 0 0 1 7.51 3.456l.33-1.652ZM10 13a3 3 0 1 0 0-6 3 3 0 0 0 0 6Z" clip-rule="evenodd" />
                         </svg>
-                        Go Back
-                    </button>
+                        Settings
+                    </div>
                 </div>
             </div>
         </div>
