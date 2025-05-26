@@ -136,10 +136,11 @@
                     {% if video_queue %}
                     <button onclick="toggleQueueSidebar()" 
                             class="lg:hidden inline-flex items-center p-2 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 border border-transparent hover:border-slate-600"
-                            title="Toggle queue">
+                            title="Show queue">
                         <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
                             <path fill-rule="evenodd" d="M3 6.75A.75.75 0 013.75 6h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 6.75zM3 12a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 12zm0 5.25a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" />
                         </svg>
+                        <span class="ml-1 text-xs">Queue</span>
                     </button>
                     {% endif %}
                     <!-- Tools Menu -->
@@ -196,10 +197,10 @@
     <main class="flex-1 flex overflow-hidden" style="height: calc(100vh - 4rem);">
         <!-- Video Queue Sidebar -->
         {% if video_queue %}
-        <div id="queue-sidebar" class="w-80 md:w-80 bg-slate-800 border-r border-slate-700 flex flex-col h-full transition-all duration-300">
+        <div id="queue-sidebar" class="w-80 md:w-80 bg-slate-800 border-r border-slate-700 flex flex-col h-full transition-all duration-300 relative">
             <!-- Queue Header -->
             <div class="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/95 backdrop-blur-sm">
-                <div class="flex items-center space-x-2">
+                <div class="flex items-center space-x-2 queue-header-content">
                     <h2 class="text-lg font-semibold text-slate-100">Up Next</h2>
                     <span class="text-slate-400 text-sm">({{ video_queue|length }})</span>
                     {% if search_query or current_media_type or current_tags or current_sort_by != 'date_added' or current_sort_order != 'desc' %}
@@ -209,19 +210,45 @@
                 
                 <!-- Collapse/Expand Button -->
                 <button id="queue-toggle-btn" onclick="toggleQueueSidebar()" 
-                        class="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-md transition-colors duration-200"
-                        title="Collapse queue">
-                    <svg id="queue-collapse-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
-                        <path fill-rule="evenodd" d="M7.72 12.53a.75.75 0 010-1.06l7.5-7.5a.75.75 0 111.06 1.06L9.31 12l6.97 6.97a.75.75 0 11-1.06 1.06l-7.5-7.5z" clip-rule="evenodd" />
+                        class="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-md transition-colors duration-200 flex-shrink-0"
+                        title="Collapse queue (Q)">
+                    <svg id="queue-collapse-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+                        <path d="M15 18L9 12l6-6"/>
                     </svg>
-                    <svg id="queue-expand-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 hidden">
-                        <path fill-rule="evenodd" d="M16.28 11.47a.75.75 0 010 1.06l-7.5 7.5a.75.75 0 01-1.06-1.06L14.69 12 7.72 5.03a.75.75 0 011.06-1.06l7.5 7.5z" clip-rule="evenodd" />
+                    <svg id="queue-expand-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5 hidden">
+                        <path d="M9 18l6-6-6-6"/>
                     </svg>
                 </button>
             </div>
+            
+            <!-- Collapsed State Indicator -->
+            <div id="queue-collapsed-indicator" class="hidden flex-col items-center justify-center h-full bg-slate-800 border-r border-slate-700">
+                <!-- Expand Button at Top -->
+                <button onclick="toggleQueueSidebar()" 
+                        class="p-2 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-md transition-colors duration-200 mb-6"
+                        title="Expand queue (Q)">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" class="w-5 h-5">
+                        <path d="M9 18l6-6-6-6"/>
+                    </svg>
+                </button>
+                
+                <!-- Vertical Text -->
+                <div class="flex flex-col items-center space-y-4">
+                    <div class="text-slate-400 text-xs font-medium transform -rotate-90 whitespace-nowrap select-none">
+                        Queue
+                    </div>
+                    <div class="w-6 h-px bg-slate-600"></div>
+                    <div class="text-slate-500 text-xs font-medium transform -rotate-90 whitespace-nowrap select-none">
+                        {{ video_queue|length }}
+                    </div>
+                </div>
+                
+                <!-- Current Video Indicator -->
+                <div class="mt-6 w-2 h-2 bg-primary rounded-full opacity-60"></div>
+            </div>
 
             <!-- Autoplay Controls -->
-            <div class="px-4 py-3 border-b border-slate-700 bg-slate-700/30">
+            <div class="autoplay-controls px-4 py-3 border-b border-slate-700 bg-slate-700/30">
                 <div class="flex items-center justify-between">
                     <span class="text-sm text-slate-300">Autoplay Next</span>
                     <button id="autoplay-next-toggle" 
@@ -242,7 +269,7 @@
 
             <!-- Filter Details -->
             {% if search_query or current_media_type or current_tags or current_sort_by != 'date_added' or current_sort_order != 'desc' %}
-            <div class="px-4 py-3 bg-slate-700/30 border-b border-slate-600">
+            <div class="filter-details px-4 py-3 bg-slate-700/30 border-b border-slate-600">
                 <div class="text-xs text-slate-400 mb-2">Active Filters:</div>
                 <div class="flex flex-wrap gap-1 text-xs">
                     {% if search_query %}
@@ -684,11 +711,47 @@
 
         /* Queue sidebar collapsed state */
         .queue-collapsed {
-            width: 4rem !important;
+            width: 3rem !important;
+            min-width: 3rem !important;
         }
         
-        .queue-collapsed .queue-content {
+        .queue-collapsed .queue-header-content {
             display: none;
+        }
+        
+        .queue-collapsed #queue-toggle-btn {
+            display: none;
+        }
+        
+        .queue-collapsed #queue-collapsed-indicator {
+            display: flex !important;
+        }
+        
+        .queue-collapsed .autoplay-controls,
+        .queue-collapsed .filter-details,
+        .queue-collapsed #video-queue-container {
+            display: none;
+        }
+        
+        /* Vertical text for collapsed state */
+        .writing-mode-vertical {
+            writing-mode: vertical-rl;
+            text-orientation: mixed;
+        }
+        
+        /* Smooth transitions for queue collapse */
+        #queue-sidebar {
+            transition: width 0.3s ease-in-out;
+        }
+        
+        /* Ensure collapsed indicator is properly positioned */
+        #queue-collapsed-indicator {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            z-index: 10;
         }
 
         /* Ensure video maintains aspect ratio within flex container */
@@ -726,8 +789,16 @@
                 transform: translateX(0);
             }
             
+            /* On mobile, collapsed state should hide completely */
             .queue-collapsed {
                 transform: translateX(-100%) !important;
+            }
+            
+            /* Hide collapsed indicator on mobile */
+            @media (max-width: 1024px) {
+                #queue-collapsed-indicator {
+                    display: none !important;
+                }
             }
         }
 
@@ -1343,6 +1414,7 @@
             const queueSidebar = document.getElementById('queue-sidebar');
             const collapseIcon = document.getElementById('queue-collapse-icon');
             const expandIcon = document.getElementById('queue-expand-icon');
+            const toggleBtn = document.getElementById('queue-toggle-btn');
             
             // Check if we're on mobile
             const isMobile = window.innerWidth <= 1024;
@@ -1360,16 +1432,31 @@
                 if (queueSidebar.classList.contains('queue-collapsed')) {
                     // Expand sidebar
                     queueSidebar.classList.remove('queue-collapsed');
-                    collapseIcon.classList.remove('hidden');
-                    expandIcon.classList.add('hidden');
+                    updateQueueToggleButton(false);
                     // Center the queue after it's expanded
                     setTimeout(centerCurrentVideoInQueue, 300);
                 } else {
                     // Collapse sidebar
                     queueSidebar.classList.add('queue-collapsed');
-                    collapseIcon.classList.add('hidden');
-                    expandIcon.classList.remove('hidden');
+                    updateQueueToggleButton(true);
                 }
+            }
+        }
+        
+        // Update queue toggle button state and tooltip
+        function updateQueueToggleButton(isCollapsed) {
+            const toggleBtn = document.getElementById('queue-toggle-btn');
+            const collapseIcon = document.getElementById('queue-collapse-icon');
+            const expandIcon = document.getElementById('queue-expand-icon');
+            
+            if (isCollapsed) {
+                collapseIcon.classList.add('hidden');
+                expandIcon.classList.remove('hidden');
+                toggleBtn.title = 'Expand queue (Q)';
+            } else {
+                collapseIcon.classList.remove('hidden');
+                expandIcon.classList.add('hidden');
+                toggleBtn.title = 'Collapse queue (Q)';
             }
         }
 
