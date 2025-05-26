@@ -347,6 +347,51 @@
                             </svg>
                         </div>
                     </div>
+                    
+                    <!-- Previous Video Button -->
+                    {% set prev_video = get_previous_video_in_queue(video_queue, video.id_db) %}
+                    {% if prev_video %}
+                        {% set prev_url_params = [] %}
+                        {% if search_query %}{% set _ = prev_url_params.append('search=' + search_query|urlencode) %}{% endif %}
+                        {% if current_media_type %}{% set _ = prev_url_params.append('media_type=' + current_media_type|urlencode) %}{% endif %}
+                        {% if current_tags %}{% set _ = prev_url_params.append('tags=' + current_tags|urlencode) %}{% endif %}
+                        {% if current_sort_by and current_sort_by != 'date_added' %}{% set _ = prev_url_params.append('sort_by=' + current_sort_by|urlencode) %}{% endif %}
+                        {% if current_sort_order and current_sort_order != 'desc' %}{% set _ = prev_url_params.append('sort_order=' + current_sort_order|urlencode) %}{% endif %}
+                        {% set prev_url_query = '?' + prev_url_params|join('&') if prev_url_params else '' %}
+                        
+                        <div class="absolute left-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <a href="{{ (url_for('video_player_page', video_name=prev_video.name) | string) + prev_url_query }}" 
+                               class="flex items-center justify-center w-12 h-12 bg-black/60 hover:bg-black/80 rounded-full transition-colors duration-200 text-white hover:text-primary"
+                               title="Previous video: {{ prev_video.display_title }}"
+                               onclick="event.stopPropagation();">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                                    <path fill-rule="evenodd" d="M7.72 12.53a.75.75 0 010-1.06l7.5-7.5a.75.75 0 111.06 1.06L9.31 12l6.97 6.97a.75.75 0 11-1.06 1.06l-7.5-7.5z" clip-rule="evenodd" />
+                                </svg>
+                            </a>
+                        </div>
+                    {% endif %}
+                    
+                    <!-- Next Video Button -->
+                    {% if next_video %}
+                        {% set next_url_params = [] %}
+                        {% if search_query %}{% set _ = next_url_params.append('search=' + search_query|urlencode) %}{% endif %}
+                        {% if current_media_type %}{% set _ = next_url_params.append('media_type=' + current_media_type|urlencode) %}{% endif %}
+                        {% if current_tags %}{% set _ = next_url_params.append('tags=' + current_tags|urlencode) %}{% endif %}
+                        {% if current_sort_by and current_sort_by != 'date_added' %}{% set _ = next_url_params.append('sort_by=' + current_sort_by|urlencode) %}{% endif %}
+                        {% if current_sort_order and current_sort_order != 'desc' %}{% set _ = next_url_params.append('sort_order=' + current_sort_order|urlencode) %}{% endif %}
+                        {% set next_url_query = '?' + next_url_params|join('&') if next_url_params else '' %}
+                        
+                        <div class="absolute right-4 top-1/2 -translate-y-1/2 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                            <a href="{{ (url_for('video_player_page', video_name=next_video.name) | string) + next_url_query }}" 
+                               class="flex items-center justify-center w-12 h-12 bg-black/60 hover:bg-black/80 rounded-full transition-colors duration-200 text-white hover:text-primary"
+                               title="Next video: {{ next_video.display_title }}"
+                               onclick="event.stopPropagation();">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                                    <path fill-rule="evenodd" d="M16.28 11.47a.75.75 0 010 1.06l-7.5 7.5a.75.75 0 01-1.06-1.06L14.69 12 7.72 5.03a.75.75 0 011.06-1.06l7.5 7.5z" clip-rule="evenodd" />
+                                </svg>
+                            </a>
+                        </div>
+                    {% endif %}
                 </div>
             </div>
 
@@ -363,6 +408,9 @@
                 <h2 class="text-xl font-semibold text-slate-100 flex items-center">
                     <span>Up Next</span>
                     <span class="ml-2 text-slate-400 text-sm">({{ video_queue|length }} videos)</span>
+                    {% if search_query or current_media_type or current_tags or current_sort_by != 'date_added' or current_sort_order != 'desc' %}
+                        <span class="ml-2 text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded-full">Filtered</span>
+                    {% endif %}
                 </h2>
                 <div class="flex items-center space-x-4">
                     <!-- Autoplay Next Toggle -->
@@ -392,11 +440,44 @@
             
             <!-- Queue Content (Collapsible) -->
             <div id="queue-content" class="border-t border-slate-700">
+                <!-- Filter Details (when filters are active) -->
+                {% if search_query or current_media_type or current_tags or current_sort_by != 'date_added' or current_sort_order != 'desc' %}
+                <div class="px-5 py-3 bg-slate-700/30 border-b border-slate-600">
+                    <div class="text-xs text-slate-400 mb-1">Queue filtered by:</div>
+                    <div class="flex flex-wrap gap-2 text-xs">
+                        {% if search_query %}
+                            <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded">Search: "{{ search_query }}"</span>
+                        {% endif %}
+                        {% if current_media_type %}
+                            <span class="bg-green-500/20 text-green-300 px-2 py-1 rounded">Type: {{ current_media_type.title() }}</span>
+                        {% endif %}
+                        {% if current_tags %}
+                            <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded">Tags: {{ current_tags }}</span>
+                        {% endif %}
+                        {% if current_sort_by != 'date_added' or current_sort_order != 'desc' %}
+                            <span class="bg-orange-500/20 text-orange-300 px-2 py-1 rounded">
+                                Sort: {{ current_sort_by.replace('_', ' ').title() }} 
+                                {{ 'Ascending' if current_sort_order == 'asc' else 'Descending' }}
+                            </span>
+                        {% endif %}
+                    </div>
+                </div>
+                {% endif %}
+                
                 <!-- Status message area for the toggle -->
                 <div id="autoplay-toggle-status" class="px-5 pt-2"></div>
-                <div class="p-5 pt-4 space-y-2 max-h-[30rem] overflow-y-auto pr-2 custom-scrollbar">
+                <div id="video-queue-container" class="p-5 pt-4 space-y-2 max-h-[30rem] overflow-y-auto pr-2 custom-scrollbar">
                     {% for q_video in video_queue %}
-                        <a href="{{ url_for('video_player_page', video_name=q_video.name) }}" 
+                        {% set queue_url_params = [] %}
+                        {% if search_query %}{% set _ = queue_url_params.append('search=' + search_query|urlencode) %}{% endif %}
+                        {% if current_media_type %}{% set _ = queue_url_params.append('media_type=' + current_media_type|urlencode) %}{% endif %}
+                        {% if current_tags %}{% set _ = queue_url_params.append('tags=' + current_tags|urlencode) %}{% endif %}
+                        {% if current_sort_by and current_sort_by != 'date_added' %}{% set _ = queue_url_params.append('sort_by=' + current_sort_by|urlencode) %}{% endif %}
+                        {% if current_sort_order and current_sort_order != 'desc' %}{% set _ = queue_url_params.append('sort_order=' + current_sort_order|urlencode) %}{% endif %}
+                        {% set queue_url_query = '?' + queue_url_params|join('&') if queue_url_params else '' %}
+                        
+                        <a href="{{ (url_for('video_player_page', video_name=q_video.name) | string) + queue_url_query }}" 
+                           id="{{ 'current-video-in-queue' if q_video.id_db == video.id_db else 'queue-item-' + loop.index|string }}"
                            class="flex items-center p-2 rounded-lg transition-all duration-150 group 
                                   {% if q_video.id_db == video.id_db %}
                                       bg-primary/20 border border-primary/50 shadow-md
@@ -749,9 +830,22 @@
             // If auto-replay is disabled, check if autoplay next is enabled
             if (autoplayNext) {
                 {% if next_video %}
-                // Automatically go to next video
-                console.log('Auto-playing next video: {{ next_video.name }}');
-                window.location.href = '/video/{{ next_video.name }}';
+                // Build URL with current filter parameters
+                const currentUrl = new URL(window.location);
+                const nextVideoUrl = new URL('/video/{{ next_video.name }}', window.location.origin);
+                
+                // Copy search and filter parameters from current URL
+                const paramsToKeep = ['search', 'media_type', 'tags', 'sort_by', 'sort_order'];
+                paramsToKeep.forEach(param => {
+                    const value = currentUrl.searchParams.get(param);
+                    if (value) {
+                        nextVideoUrl.searchParams.set(param, value);
+                    }
+                });
+                
+                // Automatically go to next video with preserved filters
+                console.log('Auto-playing next video: {{ next_video.name }} with filters');
+                window.location.href = nextVideoUrl.toString();
                 {% else %}
                 console.log('Autoplay next enabled but no next video available');
                 {% endif %}
@@ -1650,6 +1744,53 @@
         // Cleanup on page unload
         window.addEventListener('beforeunload', function() {
             stopVideoJobPolling(); // Ensure polling stops if user navigates away
+        });
+
+        // Keyboard navigation for previous/next video
+        document.addEventListener('keydown', function(event) {
+            // Only handle keyboard navigation if not typing in an input field
+            if (event.target.tagName === 'INPUT' || event.target.tagName === 'TEXTAREA' || event.target.isContentEditable) {
+                return;
+            }
+
+            // Left arrow key - previous video
+            if (event.key === 'ArrowLeft' && event.ctrlKey) {
+                event.preventDefault();
+                const prevButton = document.querySelector('a[title*="Previous video"]');
+                if (prevButton) {
+                    prevButton.click();
+                }
+            }
+            
+            // Right arrow key - next video
+            if (event.key === 'ArrowRight' && event.ctrlKey) {
+                event.preventDefault();
+                const nextButton = document.querySelector('a[title*="Next video"]');
+                if (nextButton) {
+                    nextButton.click();
+                }
+            }
+        });
+
+        // Scroll current video in queue to center
+        document.addEventListener('DOMContentLoaded', function() {
+            const currentVideoInQueue = document.getElementById('current-video-in-queue');
+            const queueContainer = document.getElementById('video-queue-container');
+            if (currentVideoInQueue && queueContainer) {
+                const queueContainerRect = queueContainer.getBoundingClientRect();
+                const currentVideoRect = currentVideoInQueue.getBoundingClientRect();
+
+                // Calculate the desired scrollTop for the queueContainer
+                // scrollTop is the distance from the top of the queueContainer to the top of the currentVideoInQueue,
+                // then adjust to center it.
+                const scrollTop = currentVideoInQueue.offsetTop - (queueContainer.clientHeight / 2) + (currentVideoInQueue.offsetHeight / 2);
+                
+                // Ensure scrollTop is not negative or beyond max scroll
+                const maxScrollTop = queueContainer.scrollHeight - queueContainer.clientHeight;
+                const finalScrollTop = Math.max(0, Math.min(scrollTop, maxScrollTop));
+
+                queueContainer.scrollTop = finalScrollTop;
+            }
         });
     </script>
 

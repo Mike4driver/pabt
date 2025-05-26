@@ -302,8 +302,15 @@ def get_media_files_from_db(
         }
     }
 
-def get_single_video_details_from_db(video_filename: str):
-    """Fetches detailed information for a single video from the database by its filename and also gets the full video queue."""
+def get_single_video_details_from_db(
+    video_filename: str,
+    search_query: str = None,
+    media_type_filter: str = None,
+    tags_filter: list = None,
+    sort_by: str = "date_added",
+    sort_order: str = "desc"
+):
+    """Fetches detailed information for a single video from the database by its filename and gets the video queue based on current filters."""
     with db_connection() as conn:
         cursor = conn.cursor()
         
@@ -311,33 +318,84 @@ def get_single_video_details_from_db(video_filename: str):
         cursor.execute("SELECT * FROM media_files WHERE filename = ? AND media_type = 'video'", (video_filename,))
         row = cursor.fetchone()
 
-        if not row: return None, [], None # Return None for video, empty queue, None for next video
+        if not row: 
+            return None, [], None # Return None for video, empty queue, None for next video
 
-        # Fetch all video files for the queue, ordered by filename
-        cursor.execute("SELECT id, filename, user_title, thumbnail_path, duration, has_specific_thumbnail FROM media_files WHERE media_type = 'video' ORDER BY filename ASC")
-        all_videos_rows = cursor.fetchall()
-
-    video_list = []
-    current_video_index = -1
-    for i, v_row in enumerate(all_videos_rows):
-        # Determine thumbnail for queue items
-        q_thumbnail_url = f"/{v_row['thumbnail_path'].replace('\\\\ ', '/')}" if v_row['has_specific_thumbnail'] and v_row['thumbnail_path'] else "/static/icons/generic-video-icon.svg"
+        # Build WHERE conditions for the queue (same logic as get_media_files_from_db)
+        where_conditions = ["media_type = 'video'"]  # Always filter to videos only for the queue
+        queue_params = []
         
-        video_list.append({
-            "id_db": v_row['id'],
-            "name": v_row['filename'],
-            "display_title": v_row['user_title'] if v_row['user_title'] else v_row['filename'],
-            "thumbnail_url_or_generic": q_thumbnail_url, # Added for queue
-            "duration_formatted": format_media_duration(v_row['duration']) # Added for queue
-        })
-        if v_row['id'] == row['id']:
-            current_video_index = i
+        # Search query - search in filename, user_title, and tags
+        if search_query:
+            search_conditions = [
+                "filename LIKE ?",
+                "user_title LIKE ?",
+                "tags LIKE ?"
+            ]
+            search_param = f"%{search_query}%"
+            where_conditions.append(f"({' OR '.join(search_conditions)})")
+            queue_params.extend([search_param, search_param, search_param])
+        
+        # Media type filter - for queue, we only want videos, but respect if user filtered to videos specifically
+        # If media_type_filter is set and it's not 'video', return empty queue since we're in video player
+        if media_type_filter and media_type_filter != 'video':
+            # User filtered to non-video content, so queue should be empty
+            video_list = []
+            next_video = None
+        else:
+            # Tags filter (OR operation - match any of the provided tags)
+            if tags_filter and isinstance(tags_filter, list) and tags_filter:
+                tag_conditions = []
+                for tag in tags_filter:
+                    if tag.strip():  # Only add non-empty tags
+                        tag_conditions.append("tags LIKE ?")
+                        queue_params.append(f'%"{tag.strip()}"%')
+                if tag_conditions:
+                    where_conditions.append(f"({' OR '.join(tag_conditions)})")
+            
+            # Build the WHERE clause
+            where_clause = "WHERE " + " AND ".join(where_conditions)
+            
+            # Build ORDER BY clause (same logic as get_media_files_from_db)
+            valid_sort_fields = {
+                'date_added': 'date_added',
+                'filename': 'filename',
+                'user_title': 'COALESCE(user_title, filename)',  # Use filename if user_title is NULL
+                'duration': 'duration',
+                'size_bytes': 'size_bytes',
+                'media_type': 'media_type'
+            }
+            
+            sort_field = valid_sort_fields.get(sort_by, 'date_added')
+            sort_direction = 'ASC' if sort_order.lower() == 'asc' else 'DESC'
+            order_clause = f"ORDER BY {sort_field} {sort_direction}"
+            
+            # Fetch all video files for the queue with the same filters and sorting as the file list
+            queue_query = f"SELECT id, filename, user_title, thumbnail_path, duration, has_specific_thumbnail FROM media_files {where_clause} {order_clause}"
+            cursor.execute(queue_query, queue_params)
+            all_videos_rows = cursor.fetchall()
 
-    next_video = None
-    if current_video_index != -1 and current_video_index + 1 < len(video_list):
-        next_video = video_list[current_video_index + 1]
+            video_list = []
+            current_video_index = -1
+            for i, v_row in enumerate(all_videos_rows):
+                # Determine thumbnail for queue items
+                q_thumbnail_url = f"/{v_row['thumbnail_path'].replace('\\\\ ', '/')}" if v_row['has_specific_thumbnail'] and v_row['thumbnail_path'] else "/static/icons/generic-video-icon.svg"
+                
+                video_list.append({
+                    "id_db": v_row['id'],
+                    "name": v_row['filename'],
+                    "display_title": v_row['user_title'] if v_row['user_title'] else v_row['filename'],
+                    "thumbnail_url_or_generic": q_thumbnail_url, # Added for queue
+                    "duration_formatted": format_media_duration(v_row['duration']) # Added for queue
+                })
+                if v_row['id'] == row['id']:
+                    current_video_index = i
 
-    # Format current video details
+            next_video = None
+            if current_video_index != -1 and current_video_index + 1 < len(video_list):
+                next_video = video_list[current_video_index + 1]
+
+    # Format current video details (unchanged)
     thumbnail_url = f"/{row['thumbnail_path'].replace('\\ ', '/')}" if row['has_specific_thumbnail'] and row['thumbnail_path'] else "/static/icons/generic-video-icon.svg"
     playable_path_url = f"/media_content/{row['filename']}"
     if row['has_transcoded_version'] and row['transcoded_path']:
@@ -370,7 +428,7 @@ def get_single_video_details_from_db(video_filename: str):
         "original_full_path": row['original_path']
     }
 
-    return current_video_details, video_list, next_video # Return current video, queue, and next video 
+    return current_video_details, video_list, next_video # Return current video, queue, and next video
 
 def get_all_tags_from_db():
     """Get all unique tags from the database for filter suggestions."""
@@ -387,4 +445,21 @@ def get_all_tags_from_db():
         except (json.JSONDecodeError, TypeError):
             continue
     
-    return sorted(list(all_tags)) 
+    return sorted(list(all_tags))
+
+def get_previous_video_in_queue(video_queue, current_video_id_db):
+    """Get the previous video in the queue based on the current video ID."""
+    if not video_queue or not current_video_id_db:
+        return None
+    
+    current_index = -1
+    for i, video in enumerate(video_queue):
+        if video['id_db'] == current_video_id_db:
+            current_index = i
+            break
+    
+    # Return previous video if current video is found and not the first one
+    if current_index > 0:
+        return video_queue[current_index - 1]
+    
+    return None 

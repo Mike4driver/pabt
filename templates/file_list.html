@@ -6,7 +6,15 @@
     data-thumbnail-url="{{ file.thumbnail }}"
     id="media-card-{{ file.id_db }}_{{ loop.index }}"
 >
-    <a href="{{ url_for('video_player_page', video_name=file.name) if file.type == 'video' else file.path }}" 
+    {% set video_url_params = [] %}
+    {% if search_query %}{% set _ = video_url_params.append('search=' + search_query|urlencode) %}{% endif %}
+    {% if current_media_type %}{% set _ = video_url_params.append('media_type=' + current_media_type|urlencode) %}{% endif %}
+    {% if current_tags %}{% set _ = video_url_params.append('tags=' + current_tags|urlencode) %}{% endif %}
+    {% if current_sort_by and current_sort_by != 'date_added' %}{% set _ = video_url_params.append('sort_by=' + current_sort_by|urlencode) %}{% endif %}
+    {% if current_sort_order and current_sort_order != 'desc' %}{% set _ = video_url_params.append('sort_order=' + current_sort_order|urlencode) %}{% endif %}
+    {% set video_url_query = '?' + video_url_params|join('&') if video_url_params else '' %}
+    
+    <a href="{{ (url_for('video_player_page', video_name=file.name) | string) + video_url_query if file.type == 'video' else file.path }}" 
        class="block aspect-[16/9] bg-black media-thumbnail-container relative"
        aria-label="View {{ file.display_title }}"
     >
@@ -37,7 +45,7 @@
     </a>
     <div class="p-2 sm:p-3 lg:p-4">
         <h3 class="text-xs sm:text-sm lg:text-base font-semibold text-slate-200 group-hover:text-primary transition-colors duration-150 truncate" title="{{ file.display_title }}">
-            <a href="{{ url_for('video_player_page', video_name=file.name) if file.type == 'video' else file.path }}" class="focus:outline-none">
+            <a href="{{ (url_for('video_player_page', video_name=file.name) | string) + video_url_query if file.type == 'video' else file.path }}" class="focus:outline-none">
                 {{ file.display_title }}
             </a>
         </h3>

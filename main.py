@@ -37,7 +37,8 @@ from media_processing import (
 )
 from data_access import (
     scan_media_directory_and_update_db,
-    get_media_files_from_db, get_single_video_details_from_db, get_all_tags_from_db
+    get_media_files_from_db, get_single_video_details_from_db, get_all_tags_from_db,
+    get_previous_video_in_queue
 )
 
 # Set up logging - logger is now imported from config
@@ -344,6 +345,9 @@ def get_media_type_from_extension(file_path: Path) -> str:
 
 templates.env.filters['slugify_for_id'] = slugify_for_id
 
+# Add helper functions to template globals
+templates.env.globals['get_previous_video_in_queue'] = get_previous_video_in_queue
+
 # --- FFmpeg Helper Functions (Basic Implementation) ---
 def run_ffmpeg_command(command_list):
     try:
@@ -585,8 +589,28 @@ async def serve_transcoded_media_file(file_name: str, request: Request):
     return FileResponse(file_path, media_type="video/mp4", filename=file_path.name)
 
 @app.get("/video/{video_name:path}", response_class=HTMLResponse)
-async def video_player_page(request: Request, video_name: str):
-    video_details, video_queue, next_video = get_single_video_details_from_db(video_name)
+async def video_player_page(
+    request: Request, 
+    video_name: str,
+    search: str = Query(None), 
+    media_type: str = Query(None),
+    tags: str = Query(None),
+    sort_by: str = Query("date_added"),
+    sort_order: str = Query("desc")
+):
+    # Parse tags parameter (comma-separated string to list)
+    tags_filter = None
+    if tags:
+        tags_filter = [tag.strip() for tag in tags.split(',') if tag.strip()]
+    
+    video_details, video_queue, next_video = get_single_video_details_from_db(
+        video_filename=video_name,
+        search_query=search,
+        media_type_filter=media_type,
+        tags_filter=tags_filter,
+        sort_by=sort_by,
+        sort_order=sort_order
+    )
     if not video_details:
         raise HTTPException(status_code=404, detail="Video not found in database")
     
@@ -604,7 +628,13 @@ async def video_player_page(request: Request, video_name: str):
         "autoplay_enabled": autoplay_enabled == "true",
         "default_muted": default_muted == "true",
         "autoplay_next": autoplay_next == "true",
-        "auto_replay": auto_replay == "true"
+        "auto_replay": auto_replay == "true",
+        # Pass filter state to template for maintaining context
+        "search_query": search or "",
+        "current_media_type": media_type or "",
+        "current_tags": tags or "",
+        "current_sort_by": sort_by,
+        "current_sort_order": sort_order
     })
 
 @app.get("/tools/media-processing", response_class=HTMLResponse)
