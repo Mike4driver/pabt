@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="en" class="h-full">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
@@ -109,8 +109,8 @@
 
     </style>
 </head>
-<body class="bg-slate-900 text-slate-200 min-h-screen flex flex-col font-sans">
-    <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700 shadow-lg">
+<body class="bg-slate-900 text-slate-200 h-full flex flex-col font-sans overflow-hidden">
+    <header class="bg-slate-800 flex-shrink-0 z-50 border-b border-slate-700 shadow-lg">
         <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
             <!-- Main Navigation Bar -->
             <div class="flex justify-between items-center h-16">
@@ -132,6 +132,16 @@
 
                 <!-- Right Navigation -->
                 <div class="flex items-center space-x-2">
+                    <!-- Mobile Queue Toggle (visible only on mobile) -->
+                    {% if video_queue %}
+                    <button onclick="toggleQueueSidebar()" 
+                            class="lg:hidden inline-flex items-center p-2 text-slate-300 hover:text-white hover:bg-slate-700/50 rounded-lg transition-all duration-200 border border-transparent hover:border-slate-600"
+                            title="Toggle queue">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                            <path fill-rule="evenodd" d="M3 6.75A.75.75 0 013.75 6h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 6.75zM3 12a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75A.75.75 0 013 12zm0 5.25a.75.75 0 01.75-.75h16.5a.75.75 0 010 1.5H3.75a.75.75 0 01-.75-.75z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                    {% endif %}
                     <!-- Tools Menu -->
                     <div class="relative" x-data="{ open: false }">
                         <button @click="open = !open" 
@@ -183,10 +193,130 @@
         </div>
     </header>
 
-    <main class="flex-grow container mx-auto max-w-screen-2xl p-4 md:p-6 lg:p-8">
-        <div class="lg:flex lg:gap-6 xl:gap-8">
-            <!-- Video Player Section -->
-            <div class="lg:flex-grow mb-6 lg:mb-0">
+    <main class="flex-1 flex overflow-hidden" style="height: calc(100vh - 4rem);">
+        <!-- Video Queue Sidebar -->
+        {% if video_queue %}
+        <div id="queue-sidebar" class="w-80 md:w-80 bg-slate-800 border-r border-slate-700 flex flex-col h-full transition-all duration-300">
+            <!-- Queue Header -->
+            <div class="flex items-center justify-between p-4 border-b border-slate-700 bg-slate-800/95 backdrop-blur-sm">
+                <div class="flex items-center space-x-2">
+                    <h2 class="text-lg font-semibold text-slate-100">Up Next</h2>
+                    <span class="text-slate-400 text-sm">({{ video_queue|length }})</span>
+                    {% if search_query or current_media_type or current_tags or current_sort_by != 'date_added' or current_sort_order != 'desc' %}
+                        <span class="text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded-full">Filtered</span>
+                    {% endif %}
+                </div>
+                
+                <!-- Collapse/Expand Button -->
+                <button id="queue-toggle-btn" onclick="toggleQueueSidebar()" 
+                        class="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700 rounded-md transition-colors duration-200"
+                        title="Collapse queue">
+                    <svg id="queue-collapse-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                        <path fill-rule="evenodd" d="M7.72 12.53a.75.75 0 010-1.06l7.5-7.5a.75.75 0 111.06 1.06L9.31 12l6.97 6.97a.75.75 0 11-1.06 1.06l-7.5-7.5z" clip-rule="evenodd" />
+                    </svg>
+                    <svg id="queue-expand-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 hidden">
+                        <path fill-rule="evenodd" d="M16.28 11.47a.75.75 0 010 1.06l-7.5 7.5a.75.75 0 01-1.06-1.06L14.69 12 7.72 5.03a.75.75 0 011.06-1.06l7.5 7.5z" clip-rule="evenodd" />
+                    </svg>
+                </button>
+            </div>
+
+            <!-- Autoplay Controls -->
+            <div class="px-4 py-3 border-b border-slate-700 bg-slate-700/30">
+                <div class="flex items-center justify-between">
+                    <span class="text-sm text-slate-300">Autoplay Next</span>
+                    <button id="autoplay-next-toggle" 
+                            onclick="toggleAutoplayNext()"
+                            class="relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 {{ 'bg-primary' if autoplay_next else 'bg-slate-600' }}"
+                            hx-post="/settings/autoplay-next"
+                            hx-vals='js:{"autoplay_next": document.getElementById("autoplay-next-toggle").dataset.enabled}'
+                            hx-target="#autoplay-toggle-status"
+                            hx-swap="innerHTML"
+                            hx-trigger="click"
+                            hx-include="this"
+                            hx-on:htmx:after-request="setTimeout(() => { document.getElementById('autoplay-toggle-status').innerHTML = ''; }, 3000);">
+                        <span id="autoplay-toggle-dot" class="absolute left-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 {{ 'translate-x-4' if autoplay_next else 'translate-x-0' }}"></span>
+                    </button>
+                </div>
+                <div id="autoplay-toggle-status" class="mt-1 text-xs"></div>
+            </div>
+
+            <!-- Filter Details -->
+            {% if search_query or current_media_type or current_tags or current_sort_by != 'date_added' or current_sort_order != 'desc' %}
+            <div class="px-4 py-3 bg-slate-700/30 border-b border-slate-600">
+                <div class="text-xs text-slate-400 mb-2">Active Filters:</div>
+                <div class="flex flex-wrap gap-1 text-xs">
+                    {% if search_query %}
+                        <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded">Search: "{{ search_query }}"</span>
+                    {% endif %}
+                    {% if current_media_type %}
+                        <span class="bg-green-500/20 text-green-300 px-2 py-1 rounded">{{ current_media_type.title() }}</span>
+                    {% endif %}
+                    {% if current_tags %}
+                        <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded">{{ current_tags }}</span>
+                    {% endif %}
+                    {% if current_sort_by != 'date_added' or current_sort_order != 'desc' %}
+                        <span class="bg-orange-500/20 text-orange-300 px-2 py-1 rounded">
+                            {{ current_sort_by.replace('_', ' ').title() }} 
+                            {{ 'Asc' if current_sort_order == 'asc' else 'Desc' }}
+                        </span>
+                    {% endif %}
+                </div>
+            </div>
+            {% endif %}
+            
+            <!-- Queue Content -->
+            <div id="video-queue-container" class="flex-1 overflow-y-auto custom-scrollbar">
+                <div class="p-3 space-y-2">
+                    {% for q_video in video_queue %}
+                        {% set queue_url_params = [] %}
+                        {% if search_query %}{% set _ = queue_url_params.append('search=' + search_query|urlencode) %}{% endif %}
+                        {% if current_media_type %}{% set _ = queue_url_params.append('media_type=' + current_media_type|urlencode) %}{% endif %}
+                        {% if current_tags %}{% set _ = queue_url_params.append('tags=' + current_tags|urlencode) %}{% endif %}
+                        {% if current_sort_by and current_sort_by != 'date_added' %}{% set _ = queue_url_params.append('sort_by=' + current_sort_by|urlencode) %}{% endif %}
+                        {% if current_sort_order and current_sort_order != 'desc' %}{% set _ = queue_url_params.append('sort_order=' + current_sort_order|urlencode) %}{% endif %}
+                        {% set queue_url_query = '?' + queue_url_params|join('&') if queue_url_params else '' %}
+                        
+                        <a href="{{ (url_for('video_player_page', video_name=q_video.name) | string) + queue_url_query }}" 
+                           id="{{ 'current-video-in-queue' if q_video.id_db == video.id_db else 'queue-item-' + loop.index|string }}"
+                           class="flex flex-col p-2 rounded-lg transition-all duration-150 group border
+                                  {% if q_video.id_db == video.id_db %}
+                                      bg-primary/20 border-primary/50 shadow-md ring-1 ring-primary/30
+                                  {% else %}
+                                      hover:bg-slate-700/60 border-transparent hover:border-slate-600
+                                  {% endif %}"
+                           title="{{ q_video.display_title }}">
+                            <img src="{{ q_video.thumbnail_url_or_generic }}" alt="Thumbnail for {{ q_video.display_title }}" 
+                                 class="w-full aspect-video object-cover rounded-md mb-2 border border-slate-600">
+                            <div class="flex-grow">
+                                <p class="text-sm font-medium line-clamp-2 leading-tight mb-1
+                                          {% if q_video.id_db == video.id_db %}
+                                              text-primary
+                                          {% else %}
+                                              text-slate-200 group-hover:text-primary
+                                          {% endif %}">
+                                    {{ q_video.display_title }}
+                                </p>
+                                <div class="flex items-center justify-between text-xs text-slate-400">
+                                    <span>{{ q_video.duration_formatted if q_video.duration_formatted else 'N/A' }}</span>
+                                    {% if q_video.id_db == video.id_db %}
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-primary">
+                                            <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                                        </svg>
+                                    {% endif %}
+                                </div>
+                            </div>
+                        </a>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+        {% endif %}
+
+                <!-- Main Content Area -->
+        <div class="flex-1 flex flex-col min-w-0 h-full overflow-hidden">
+            <div class="flex-1 flex flex-col lg:flex-row gap-4 lg:gap-6 xl:gap-8 p-3 md:p-4 lg:p-6 xl:p-8 min-h-0">
+                <!-- Video Player Section -->
+                <div class="flex-1 flex flex-col min-w-0">
                 <!-- Video Title and Status -->
                 <div class="mb-4" id="video-title-header">
                     <h1 class="text-2xl lg:text-3xl font-bold text-slate-100 mb-2 overflow-hidden whitespace-nowrap text-ellipsis" title="{{ video.display_title }}">{{ video.display_title }}</h1>
@@ -208,7 +338,7 @@
                 </div>
 
                 <!-- Custom Video Player Container -->
-                <div class="aspect-video bg-black rounded-lg overflow-hidden shadow-2xl relative group {{ 'ring-2 ring-blue-500/50 shadow-blue-500/20' if auto_replay else '' }}" id="video-player-container">
+                <div class="flex-1 bg-black rounded-lg overflow-hidden shadow-2xl relative group {{ 'ring-2 ring-blue-500/50 shadow-blue-500/20' if auto_replay else '' }} min-h-0" id="video-player-container">
                     <video id="main-video-player" 
                            class="w-full h-full" 
                            poster="{{ video.thumbnail }}"
@@ -395,122 +525,12 @@
                 </div>
             </div>
 
-            <!-- Metadata Sidebar Section -->
-            {% include "_video_metadata_sidebar.html" %}
-        </div>
-
-        <!-- Video Queue Section -->
-        {% if video_queue %}
-        <div class="mt-8 bg-slate-800 rounded-lg shadow-xl border border-slate-700">
-            <!-- Queue Header (Clickable) -->
-            <div class="flex items-center justify-between p-5 cursor-pointer hover:bg-slate-700/50 transition-colors duration-150 rounded-t-lg" 
-                 onclick="toggleQueue()">
-                <h2 class="text-xl font-semibold text-slate-100 flex items-center">
-                    <span>Up Next</span>
-                    <span class="ml-2 text-slate-400 text-sm">({{ video_queue|length }} videos)</span>
-                    {% if search_query or current_media_type or current_tags or current_sort_by != 'date_added' or current_sort_order != 'desc' %}
-                        <span class="ml-2 text-xs text-blue-400 bg-blue-500/20 px-2 py-1 rounded-full">Filtered</span>
-                    {% endif %}
-                </h2>
-                <div class="flex items-center space-x-4">
-                    <!-- Autoplay Next Toggle -->
-                    <div class="flex items-center space-x-2" onclick="event.stopPropagation();">
-                        <span class="text-xs text-slate-400">Autoplay</span>
-                        <button id="autoplay-next-toggle" 
-                                onclick="toggleAutoplayNext()"
-                                class="relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 {{ 'bg-primary' if autoplay_next else 'bg-slate-600' }}"
-                                hx-post="/settings/autoplay-next"
-                                hx-vals='js:{"autoplay_next": document.getElementById("autoplay-next-toggle").dataset.enabled}'
-                                hx-target="#autoplay-toggle-status"
-                                hx-swap="innerHTML"
-                                hx-trigger="click"
-                                hx-include="this"
-                                hx-on:htmx:after-request="setTimeout(() => { document.getElementById('autoplay-toggle-status').innerHTML = ''; }, 3000);">
-                            <span id="autoplay-toggle-dot" class="absolute left-1 inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 {{ 'translate-x-5' if autoplay_next else 'translate-x-0' }}"></span>
-                        </button>
-                    </div>
-                    <div class="flex items-center text-slate-400">
-                        <svg id="queue-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" 
-                             class="w-5 h-5 transform transition-transform duration-200">
-                            <path fill-rule="evenodd" d="M12.53 16.28a.75.75 0 01-1.06 0l-7.5-7.5a.75.75 0 011.06-1.06L12 14.69l6.97-6.97a.75.75 0 111.06 1.06l-7.5 7.5z" clip-rule="evenodd" />
-                        </svg>
-                    </div>
-                </div>
-            </div>
-            
-            <!-- Queue Content (Collapsible) -->
-            <div id="queue-content" class="border-t border-slate-700">
-                <!-- Filter Details (when filters are active) -->
-                {% if search_query or current_media_type or current_tags or current_sort_by != 'date_added' or current_sort_order != 'desc' %}
-                <div class="px-5 py-3 bg-slate-700/30 border-b border-slate-600">
-                    <div class="text-xs text-slate-400 mb-1">Queue filtered by:</div>
-                    <div class="flex flex-wrap gap-2 text-xs">
-                        {% if search_query %}
-                            <span class="bg-blue-500/20 text-blue-300 px-2 py-1 rounded">Search: "{{ search_query }}"</span>
-                        {% endif %}
-                        {% if current_media_type %}
-                            <span class="bg-green-500/20 text-green-300 px-2 py-1 rounded">Type: {{ current_media_type.title() }}</span>
-                        {% endif %}
-                        {% if current_tags %}
-                            <span class="bg-purple-500/20 text-purple-300 px-2 py-1 rounded">Tags: {{ current_tags }}</span>
-                        {% endif %}
-                        {% if current_sort_by != 'date_added' or current_sort_order != 'desc' %}
-                            <span class="bg-orange-500/20 text-orange-300 px-2 py-1 rounded">
-                                Sort: {{ current_sort_by.replace('_', ' ').title() }} 
-                                {{ 'Ascending' if current_sort_order == 'asc' else 'Descending' }}
-                            </span>
-                        {% endif %}
-                    </div>
-                </div>
-                {% endif %}
-                
-                <!-- Status message area for the toggle -->
-                <div id="autoplay-toggle-status" class="px-5 pt-2"></div>
-                <div id="video-queue-container" class="p-5 pt-4 space-y-2 max-h-[30rem] overflow-y-auto pr-2 custom-scrollbar">
-                    {% for q_video in video_queue %}
-                        {% set queue_url_params = [] %}
-                        {% if search_query %}{% set _ = queue_url_params.append('search=' + search_query|urlencode) %}{% endif %}
-                        {% if current_media_type %}{% set _ = queue_url_params.append('media_type=' + current_media_type|urlencode) %}{% endif %}
-                        {% if current_tags %}{% set _ = queue_url_params.append('tags=' + current_tags|urlencode) %}{% endif %}
-                        {% if current_sort_by and current_sort_by != 'date_added' %}{% set _ = queue_url_params.append('sort_by=' + current_sort_by|urlencode) %}{% endif %}
-                        {% if current_sort_order and current_sort_order != 'desc' %}{% set _ = queue_url_params.append('sort_order=' + current_sort_order|urlencode) %}{% endif %}
-                        {% set queue_url_query = '?' + queue_url_params|join('&') if queue_url_params else '' %}
-                        
-                        <a href="{{ (url_for('video_player_page', video_name=q_video.name) | string) + queue_url_query }}" 
-                           id="{{ 'current-video-in-queue' if q_video.id_db == video.id_db else 'queue-item-' + loop.index|string }}"
-                           class="flex items-center p-2 rounded-lg transition-all duration-150 group 
-                                  {% if q_video.id_db == video.id_db %}
-                                      bg-primary/20 border border-primary/50 shadow-md ring-1 ring-primary/30
-                                  {% else %}
-                                      hover:bg-slate-700/60 border border-transparent hover:border-slate-600
-                                  {% endif %}"
-                           title="{{ q_video.display_title }}">
-                            <img src="{{ q_video.thumbnail_url_or_generic }}" alt="Thumbnail for {{ q_video.display_title }}" 
-                                 class="w-24 h-14 object-cover rounded-md mr-3 flex-shrink-0 border border-slate-600">
-                            <div class="flex-grow overflow-hidden">
-                                <p class="text-sm font-medium truncate 
-                                          {% if q_video.id_db == video.id_db %}
-                                              text-primary
-                                          {% else %}
-                                              text-slate-200 group-hover:text-primary
-                                          {% endif %}">
-                                    {{ q_video.display_title }}
-                                </p>
-                                <p class="text-xs text-slate-400">
-                                    {{ q_video.duration_formatted if q_video.duration_formatted else 'N/A' }}
-                                </p>
-                            </div>
-                            {% if q_video.id_db == video.id_db %}
-                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-primary flex-shrink-0 ml-2">
-                                    <path fill-rule="evenodd" d="M2 10a.75.75 0 01.75-.75h12.59l-2.1-1.95a.75.75 0 111.02-1.1l3.5 3.25a.75.75 0 010 1.1l-3.5 3.25a.75.75 0 11-1.02-1.1l2.1-1.95H2.75A.75.75 0 012 10z" clip-rule="evenodd" />
-                                </svg>
-                            {% endif %}
-                        </a>
-                    {% endfor %}
+                            <!-- Metadata Sidebar Section -->
+                <div class="lg:w-80 xl:w-96 flex-shrink-0 h-full">
+                    {% include "_video_metadata_sidebar.html" %}
                 </div>
             </div>
         </div>
-        {% endif %}
 
     </main>
 
@@ -652,6 +672,70 @@
         .custom-scrollbar {
             scrollbar-width: thin;
             scrollbar-color: #475569 transparent; /* thumb and track */
+        }
+
+        /* Line clamp utility for text truncation */
+        .line-clamp-2 {
+            display: -webkit-box;
+            -webkit-line-clamp: 2;
+            -webkit-box-orient: vertical;
+            overflow: hidden;
+        }
+
+        /* Queue sidebar collapsed state */
+        .queue-collapsed {
+            width: 4rem !important;
+        }
+        
+        .queue-collapsed .queue-content {
+            display: none;
+        }
+
+        /* Ensure video maintains aspect ratio within flex container */
+        #video-player-container video {
+            object-fit: contain;
+        }
+
+        /* Custom scrollbar for metadata sidebar */
+        .metadata-scrollbar::-webkit-scrollbar {
+            width: 6px;
+        }
+        .metadata-scrollbar::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        .metadata-scrollbar::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        .metadata-scrollbar::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
+
+        /* Mobile responsiveness */
+        @media (max-width: 1024px) {
+            #queue-sidebar {
+                position: absolute;
+                left: 0;
+                top: 0;
+                z-index: 40;
+                transform: translateX(-100%);
+                transition: transform 0.3s ease-in-out;
+            }
+            
+            #queue-sidebar.mobile-visible {
+                transform: translateX(0);
+            }
+            
+            .queue-collapsed {
+                transform: translateX(-100%) !important;
+            }
+        }
+
+        /* Ensure proper aspect ratio on smaller screens */
+        @media (max-width: 768px) {
+            #video-player-container {
+                min-height: 200px;
+            }
         }
     </style>
     <script>
@@ -1254,20 +1338,45 @@
             }
         });
 
-        // Toggle queue visibility
-        function toggleQueue() {
-            const queueContent = document.getElementById('queue-content');
-            const chevron = document.getElementById('queue-chevron');
+        // Toggle queue sidebar visibility
+        function toggleQueueSidebar() {
+            const queueSidebar = document.getElementById('queue-sidebar');
+            const collapseIcon = document.getElementById('queue-collapse-icon');
+            const expandIcon = document.getElementById('queue-expand-icon');
             
-            if (queueContent.style.display === 'none') {
-                queueContent.style.display = 'block';
-                chevron.classList.remove('rotate-180');
-                // Center the queue after it's expanded
-                setTimeout(centerCurrentVideoInQueue, 300); // Wait for CSS transition
+            // Check if we're on mobile
+            const isMobile = window.innerWidth <= 1024;
+            
+            if (isMobile) {
+                // Mobile behavior - slide in/out
+                if (queueSidebar.classList.contains('mobile-visible')) {
+                    queueSidebar.classList.remove('mobile-visible');
+                } else {
+                    queueSidebar.classList.add('mobile-visible');
+                    setTimeout(centerCurrentVideoInQueue, 300);
+                }
             } else {
-                queueContent.style.display = 'none';
-                chevron.classList.add('rotate-180');
+                // Desktop behavior - collapse/expand
+                if (queueSidebar.classList.contains('queue-collapsed')) {
+                    // Expand sidebar
+                    queueSidebar.classList.remove('queue-collapsed');
+                    collapseIcon.classList.remove('hidden');
+                    expandIcon.classList.add('hidden');
+                    // Center the queue after it's expanded
+                    setTimeout(centerCurrentVideoInQueue, 300);
+                } else {
+                    // Collapse sidebar
+                    queueSidebar.classList.add('queue-collapsed');
+                    collapseIcon.classList.add('hidden');
+                    expandIcon.classList.remove('hidden');
+                }
             }
+        }
+
+        // Legacy function for backward compatibility
+        function toggleQueue() {
+            // For keyboard shortcuts and other legacy calls
+            centerCurrentVideoInQueue();
         }
 
         // Handle new transcode event triggered by HX-Trigger from server
@@ -1328,11 +1437,11 @@
             const enabled = toggleBtn.dataset.enabled === 'true';
             
             if (enabled) {
-                toggleBtn.className = 'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 bg-primary';
-                toggleDot.className = 'absolute left-1 inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 translate-x-5';
+                toggleBtn.className = 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 bg-primary';
+                toggleDot.className = 'absolute left-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 translate-x-4';
             } else {
-                toggleBtn.className = 'relative inline-flex h-6 w-11 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 bg-slate-600';
-                toggleDot.className = 'absolute left-1 inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 translate-x-0';
+                toggleBtn.className = 'relative inline-flex h-5 w-9 items-center rounded-full transition-colors duration-200 focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 focus:ring-offset-slate-800 bg-slate-600';
+                toggleDot.className = 'absolute left-0.5 inline-block h-4 w-4 transform rounded-full bg-white shadow-lg transition-transform duration-200 translate-x-0';
             }
         }
 
@@ -1741,6 +1850,20 @@
         document.addEventListener('DOMContentLoaded', function() {
             // Check for existing jobs related to this video on page load
             refreshVideoJobs();
+            
+            // Add click-outside handler for mobile queue
+            document.addEventListener('click', function(event) {
+                const queueSidebar = document.getElementById('queue-sidebar');
+                const isMobile = window.innerWidth <= 1024;
+                
+                if (isMobile && queueSidebar && queueSidebar.classList.contains('mobile-visible')) {
+                    // Check if click is outside the queue sidebar and not on the toggle button
+                    if (!queueSidebar.contains(event.target) && 
+                        !event.target.closest('button[onclick*="toggleQueueSidebar"]')) {
+                        queueSidebar.classList.remove('mobile-visible');
+                    }
+                }
+            });
         });
 
         // Cleanup on page unload
@@ -1779,10 +1902,10 @@
                 }
             }
             
-            // Q key - toggle queue and center current video
+            // Q key - toggle queue sidebar
             if (event.key === 'q' || event.key === 'Q') {
                 event.preventDefault();
-                toggleQueue();
+                toggleQueueSidebar();
             }
             
             // C key - center current video in queue (for testing)
@@ -1796,6 +1919,7 @@
         function centerCurrentVideoInQueue(smooth = true) {
             const currentVideoInQueue = document.getElementById('current-video-in-queue');
             const queueContainer = document.getElementById('video-queue-container');
+            const queueSidebar = document.getElementById('queue-sidebar');
             
             if (!currentVideoInQueue || !queueContainer) {
                 console.log('Queue centering: Missing elements', {
@@ -1808,12 +1932,13 @@
             // Wait for layout to be complete
             requestAnimationFrame(() => {
                 try {
-                    // Get the queue content element (parent of queue items)
-                    const queueContent = document.getElementById('queue-content');
-                    
-                    // Check if queue is visible
-                    if (queueContent && queueContent.style.display === 'none') {
-                        console.log('Queue is collapsed, skipping centering');
+                    // Check if queue sidebar is collapsed or hidden on mobile
+                    const isMobile = window.innerWidth <= 1024;
+                    if (queueSidebar && (
+                        queueSidebar.classList.contains('queue-collapsed') ||
+                        (isMobile && !queueSidebar.classList.contains('mobile-visible'))
+                    )) {
+                        console.log('Queue sidebar is collapsed or hidden, skipping centering');
                         return;
                     }
                     
@@ -1873,8 +1998,8 @@
                         });
                     } else {
                         // Fallback for browsers that don't support smooth scrolling
-                        queueContainer.scrollTop = finalScrollTop;
-                    }
+                queueContainer.scrollTop = finalScrollTop;
+            }
                     
                     console.log('Queue centered on current video at position:', finalScrollTop);
                 } catch (error) {
@@ -1926,12 +2051,12 @@
             
             // Use a longer delay to ensure all elements are fully rendered and laid out
             setTimeout(() => {
-                // Check if the queue is expanded (visible) by default
-                const queueContent = document.getElementById('queue-content');
-                if (queueContent && queueContent.style.display !== 'none') {
+                // Check if the queue sidebar exists and is not collapsed
+                const queueSidebar = document.getElementById('queue-sidebar');
+                if (queueSidebar && !queueSidebar.classList.contains('queue-collapsed')) {
                     centerCurrentVideoInQueue();
                 } else {
-                    console.log('Queue is collapsed on page load, not centering');
+                    console.log('Queue sidebar is collapsed or missing on page load, not centering');
                 }
             }, 300); // Increased delay to ensure layout is complete
         });
@@ -1946,6 +2071,51 @@
         });
 
         
+        // Collapsible sections functionality
+        function toggleSection(sectionId) {
+            const content = document.getElementById(sectionId + '-content');
+            const chevron = document.getElementById(sectionId + '-chevron');
+            
+            if (!content || !chevron) return;
+            
+            const isHidden = content.classList.contains('hidden');
+            
+            if (isHidden) {
+                content.classList.remove('hidden');
+                chevron.style.transform = 'rotate(180deg)';
+            } else {
+                content.classList.add('hidden');
+                chevron.style.transform = 'rotate(0deg)';
+            }
+        }
+
+        // Initialize collapsible sections on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // System details section starts expanded
+            const systemDetailsContent = document.getElementById('system-details-content');
+            const systemDetailsChevron = document.getElementById('system-details-chevron');
+            if (systemDetailsContent && systemDetailsChevron) {
+                systemDetailsContent.classList.remove('hidden');
+                systemDetailsChevron.style.transform = 'rotate(180deg)';
+            }
+            
+            // Media processing section starts collapsed
+            const mediaProcessingContent = document.getElementById('media-processing-content');
+            const mediaProcessingChevron = document.getElementById('media-processing-chevron');
+            if (mediaProcessingContent && mediaProcessingChevron) {
+                mediaProcessingContent.classList.add('hidden');
+                mediaProcessingChevron.style.transform = 'rotate(0deg)';
+            }
+            
+            // Danger zone section starts collapsed
+            const dangerZoneContent = document.getElementById('danger-zone-content');
+            const dangerZoneChevron = document.getElementById('danger-zone-chevron');
+            if (dangerZoneContent && dangerZoneChevron) {
+                dangerZoneContent.classList.add('hidden');
+                dangerZoneChevron.style.transform = 'rotate(0deg)';
+            }
+        });
+
     </script>
 
     <!-- Toast Notification Container for Video Page -->

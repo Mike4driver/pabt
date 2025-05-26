@@ -1,351 +1,383 @@
-<div class="lg:w-96 xl:w-[400px] lg:flex-shrink-0 bg-slate-800 p-5 rounded-lg shadow-xl" id="video-metadata-sidebar">
-                <div id="metadata-display-section">
-                    <div class="flex justify-between items-start">
-                        <h2 class="text-xl font-semibold mb-1 text-white overflow-hidden whitespace-nowrap text-ellipsis" title="{{ video.display_title }}">{{ video.display_title }}</h2>
-                        {% if video.id_db %}
-                        <button onclick="toggleEditMetadataMode(true)" id="edit-metadata-button" class="text-slate-400 hover:text-primary p-1">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                                <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
-                                <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
-                            </svg>
-                        </button>
-                        {% else %}
-                        <button disabled class="text-slate-600 cursor-not-allowed p-1" title="Cannot edit: Video database ID missing. Rescan media directory to fix.">
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
-                                <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
-                                <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
-                            </svg>
-                        </button>
-                        {% endif %}
-                    </div>
-                    <p class="text-xs text-slate-500 mb-2">Filename: {{ video.name }}</p>
-                    
-                    {% if video.tags %}
-                    <div class="mb-4" id="tags-display-area">
-                        <h3 class="text-sm font-medium text-slate-400 mb-1.5">Tags:</h3>
-                        <div class="flex flex-wrap gap-2">
-                            {% for tag in video.tags %}
-                            <span class="bg-slate-700 text-slate-300 text-xs px-2.5 py-1 rounded-full flex items-center group">
-                                {{ tag }}
-                                {% if video.id_db %}
-                                <button hx-delete="{{ url_for('remove_video_tag', video_id_db=video.id_db, tag_name=tag) }}"
-                                        hx-target="#video-metadata-sidebar"
-                                        hx-swap="outerHTML"
-                                        hx-confirm="Remove tag '{{ tag }}'?"
-                                        class="ml-1.5 text-slate-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
-                                        title="Remove tag">×</button>
-                                {% endif %}
-                            </span>
-                            {% endfor %}
-                        </div>
-                    </div>
-                    {% else %}
-                    <div class="mb-4" id="tags-display-area">
-                         <p class="text-sm text-slate-500 italic">No tags yet.</p>
-                    </div>
+<div class="lg:w-96 xl:w-[400px] lg:flex-shrink-0 bg-slate-800 p-5 rounded-lg shadow-xl h-full flex flex-col" id="video-metadata-sidebar">
+    <!-- Fixed Header Section -->
+    <div id="metadata-display-section" class="flex-shrink-0">
+        <div class="flex justify-between items-start">
+            <h2 class="text-xl font-semibold mb-1 text-white overflow-hidden whitespace-nowrap text-ellipsis" title="{{ video.display_title }}">{{ video.display_title }}</h2>
+            {% if video.id_db %}
+            <button onclick="toggleEditMetadataMode(true)" id="edit-metadata-button" class="text-slate-400 hover:text-primary p-1">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                    <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
+                    <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
+                </svg>
+            </button>
+            {% else %}
+            <button disabled class="text-slate-600 cursor-not-allowed p-1" title="Cannot edit: Video database ID missing. Rescan media directory to fix.">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5">
+                    <path d="M5.433 13.917l1.262-3.155A4 4 0 017.58 9.42l6.92-6.918a2.121 2.121 0 013 3l-6.92 6.918c-.383.383-.84.685-1.343.886l-3.154 1.262a.5.5 0 01-.65-.65z" />
+                    <path d="M3.5 5.75c0-.69.56-1.25 1.25-1.25H10A.75.75 0 0010 3H4.75A2.75 2.75 0 002 5.75v9.5A2.75 2.75 0 004.75 18h9.5A2.75 2.75 0 0017 15.25V10a.75.75 0 00-1.5 0v5.25c0 .69-.56 1.25-1.25 1.25h-9.5c-.69 0-1.25-.56-1.25-1.25v-9.5z" />
+                </svg>
+            </button>
+            {% endif %}
+        </div>
+        <p class="text-xs text-slate-500 mb-3">{{ video.name }}</p>
+        
+        {% if video.tags %}
+        <div class="mb-4" id="tags-display-area">
+            <h3 class="text-sm font-medium text-slate-400 mb-1.5">Tags:</h3>
+            <div class="flex flex-wrap gap-2">
+                {% for tag in video.tags %}
+                <span class="bg-slate-700 text-slate-300 text-xs px-2.5 py-1 rounded-full flex items-center group">
+                    {{ tag }}
+                    {% if video.id_db %}
+                    <button hx-delete="{{ url_for('remove_video_tag', video_id_db=video.id_db, tag_name=tag) }}"
+                            hx-target="#video-metadata-sidebar"
+                            hx-swap="outerHTML"
+                            hx-confirm="Remove tag '{{ tag }}'?"
+                            class="ml-1.5 text-slate-400 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                            title="Remove tag">×</button>
                     {% endif %}
-                    <p class="text-xs text-slate-400 mb-4">System Details</p>
-                </div>
+                </span>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <div class="mb-4" id="tags-display-area">
+             <p class="text-sm text-slate-500 italic">No tags yet.</p>
+        </div>
+        {% endif %}
+    </div>
 
-                <!-- Metadata Edit Form (Initially Hidden) -->
-                {% if video.id_db %}
-                <form id="metadata-edit-form" class="hidden space-y-4 mb-6"
-                      hx-post="{{ url_for('update_video_metadata', video_id_db=video.id_db) }}"
-                      hx-target="#video-metadata-sidebar" {# Target the whole sidebar for now to refresh display and form #}
-                      hx-swap="outerHTML" {# Replace the entire sidebar, which will re-render it in display mode #}
-                      hx-indicator="#metadata-save-spinner"
-                      hx-on:htmx:after-request="handleMetadataUpdateResponse(event)"
-                      >
-                    <div>
-                        <label for="user_title" class="block text-sm font-medium text-slate-300 mb-1">Custom Title</label>
-                        <input type="text" name="user_title" id="user_title" value="{{ video.user_title if video.user_title is not none else '' }}" placeholder="Enter custom title (optional)" 
-                               class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
-                        <p class="text-xs text-slate-500 mt-1">Leave blank to use filename.</p>
-                    </div>
-                    <div>
-                        <label for="tags" class="block text-sm font-medium text-slate-300 mb-1">Tags</label>
-                        <input type="text" name="tags_str" id="tags-input" value="{{ video.tags|join(', ') if video.tags else '' }}" placeholder="Enter tags, comma-separated" 
-                               class="w-full choices-tags-input">
-                         <p class="text-xs text-slate-500 mt-1">Comma-separated list of tags.</p>
-                    </div>
-                    <div class="flex items-center gap-3">
-                        <button type="submit" class="btn-base btn-primary">
-                            <span id="metadata-save-spinner" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                            Save Changes
-                        </button>
-                        <button type="button" onclick="toggleEditMetadataMode(false)" class="btn-base bg-slate-600 text-slate-200 hover:bg-slate-500">
-                            Cancel
-                        </button>
-                    </div>
-                    <div id="metadata-edit-message" class="text-xs mt-2"></div>
-                </form>
+    <!-- Metadata Edit Form (Initially Hidden) -->
+    {% if video.id_db %}
+    <form id="metadata-edit-form" class="hidden space-y-4 mb-6 flex-shrink-0"
+          hx-post="{{ url_for('update_video_metadata', video_id_db=video.id_db) }}"
+          hx-target="#video-metadata-sidebar"
+          hx-swap="outerHTML"
+          hx-indicator="#metadata-save-spinner"
+          hx-on:htmx:after-request="handleMetadataUpdateResponse(event)">
+        <div>
+            <label for="user_title" class="block text-sm font-medium text-slate-300 mb-1">Custom Title</label>
+            <input type="text" name="user_title" id="user_title" value="{{ video.user_title if video.user_title is not none else '' }}" placeholder="Enter custom title (optional)" 
+                   class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+            <p class="text-xs text-slate-500 mt-1">Leave blank to use filename.</p>
+        </div>
+        <div>
+            <label for="tags" class="block text-sm font-medium text-slate-300 mb-1">Tags</label>
+            <input type="text" name="tags_str" id="tags-input" value="{{ video.tags|join(', ') if video.tags else '' }}" placeholder="Enter tags, comma-separated" 
+                   class="w-full choices-tags-input">
+             <p class="text-xs text-slate-500 mt-1">Comma-separated list of tags.</p>
+        </div>
+        <div class="flex items-center gap-3">
+            <button type="submit" class="btn-base btn-primary">
+                <span id="metadata-save-spinner" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                Save Changes
+            </button>
+            <button type="button" onclick="toggleEditMetadataMode(false)" class="btn-base bg-slate-600 text-slate-200 hover:bg-slate-500">
+                Cancel
+            </button>
+        </div>
+        <div id="metadata-edit-message" class="text-xs mt-2"></div>
+    </form>
+    {% else %}
+    <div id="metadata-edit-form" class="hidden space-y-4 mb-6 p-4 bg-red-900/20 border border-red-600/50 rounded-lg flex-shrink-0">
+        <div class="text-red-300 text-sm">
+            <p class="font-semibold">Unable to Edit Metadata</p>
+            <p class="text-xs mt-1">Video database ID is missing. This video may need to be rescanned.</p>
+        </div>
+        <button type="button" onclick="toggleEditMetadataMode(false)" class="btn-base bg-slate-600 text-slate-200 hover:bg-slate-500">
+            Close
+        </button>
+    </div>
+    {% endif %}
+
+    <!-- Scrollable Content Area -->
+    <div class="flex-1 overflow-y-auto custom-scrollbar space-y-4">
+        <!-- System Details Section -->
+        <div class="bg-slate-700/30 rounded-lg p-3">
+            <button onclick="toggleSection('system-details')" class="w-full flex items-center justify-between text-left mb-2">
+                <h3 class="text-sm font-medium text-slate-300">System Details</h3>
+                <svg id="system-details-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-400 transition-transform duration-200">
+                    <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <div id="system-details-content" class="space-y-2 text-sm">
+                <div class="flex justify-between">
+                    <span class="text-slate-400 font-medium">Duration:</span>
+                    <span class="text-slate-200">{{ video.duration }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400 font-medium">Resolution:</span>
+                    <span class="text-slate-200">{{ video.resolution }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400 font-medium">FPS:</span>
+                    <span class="text-slate-200">{{ video.fps }}</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400 font-medium">Size:</span>
+                    <span class="text-slate-200">{{ "%.2f" | format(video.size / (1024*1024)) }} MB</span>
+                </div>
+                <div class="flex justify-between">
+                    <span class="text-slate-400 font-medium">Path:</span>
+                    <span class="text-slate-200 overflow-hidden whitespace-nowrap text-ellipsis" title="{{ video.path }}">{{ video.path }}</span>
+                </div>
+            </div>
+        </div>
+
+        {% if error_message %}
+        <div class="p-3 bg-red-700/30 border border-red-600/50 text-red-300 text-sm rounded-md" role="alert">
+            <p class="font-semibold">Operation Note:</p>
+            <p>{{ error_message }}</p>
+        </div>
+        {% endif %}
+
+        <!-- Background Job Status Section -->
+        <div id="video-background-jobs" class="hidden">
+            <div class="bg-slate-700/50 p-4 rounded-lg border border-slate-600">
+                <div class="flex items-center justify-between mb-2">
+                    <h3 class="text-sm font-semibold text-slate-100 flex items-center">
+                        <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2"></div>
+                        Background Operations
+                    </h3>
+                    <button onclick="hideVideoJobs()" class="text-xs text-slate-400 hover:text-slate-300">✕</button>
+                </div>
+                <div id="video-jobs-container" class="space-y-2">
+                    <!-- Jobs will be inserted here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Primary Actions Section -->
+        <div class="bg-slate-700/30 rounded-lg p-3">
+            <h3 class="text-sm font-medium text-slate-300 mb-3">Primary Actions</h3>
+            <div class="space-y-2">
+                <a href="{{ video.original_path_for_download }}" download 
+                   class="btn-base btn-primary w-full text-sm py-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-2">
+                        <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
+                        <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
+                    </svg>
+                    Download ({{ (video.size / (1024*1024)) | round(2) }} MB)
+                </a>
+
+                {% if video.type == 'video' %}
+                <button onclick="openAdvancedTranscodingModal()"
+                        class="btn-base btn-secondary w-full bg-indigo-600 hover:bg-indigo-500 focus:ring-indigo-500/60 text-sm py-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 mr-2">
+                        <path fill-rule="evenodd" d="M11.828 2.25c-.916 0-1.699.663-1.85 1.567l-.091.549a.798.798 0 01-.517.608 7.45 7.45 0 00-.478.198.798.798 0 01-.796-.064l-.453-.324a1.875 1.875 0 00-2.416.2l-.243.243a1.875 1.875 0 00-.2 2.416l.324.453a.798.798 0 01.064.796l-.324.453a1.875 1.875 0 00.2 2.416l.243.243c.648.648 1.67.733 2.416.2l.453-.324a.798.798 0 01.796-.064c.157.071.316.137.478.198.267.1.47.327.517.608l.091.549a1.875 1.875 0 001.85 1.567h.344c.916 0 1.699-.663 1.85-1.567l.091-.549a.798.798 0 01.517-.608 7.52 7.52 0 00.478-.198.798.798 0 01.796.064l.453.324a1.875 1.875 0 002.416-.2l.243-.243c.648-.648.733-1.67.2-2.416l-.324-.453a.798.798 0 01-.064-.796c.071-.157.137-.316.198-.478.1-.267.327-.47.608-.517l.549-.091A1.875 1.875 0 0021.75 12.172v-.344c0-.916-.663-1.699-1.567-1.85l-.549-.091a.798.798 0 01-.608-.517 7.507 7.507 0 00-.198-.478.798.798 0 01.064-.796l.324-.453a1.875 1.875 0 00-.2-2.416l-.243-.243a1.875 1.875 0 00-2.416-.2l-.453.324a.798.798 0 01-.796.064 7.462 7.462 0 00-.478-.198.798.798 0 01-.517-.608l-.091-.549A1.875 1.875 0 0012.172 2.25h-.344zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" clip-rule="evenodd" />
+                    </svg>
+                    Advanced Options
+                </button>
+                {% endif %}
+            </div>
+        </div>
+
+        <!-- Media Processing Section -->
+        <div class="bg-slate-700/30 rounded-lg p-3">
+            <button onclick="toggleSection('media-processing')" class="w-full flex items-center justify-between text-left mb-3">
+                <h3 class="text-sm font-medium text-slate-300">Media Processing</h3>
+                <svg id="media-processing-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-400 transition-transform duration-200">
+                    <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <div id="media-processing-content" class="hidden space-y-2">
+                <!-- Thumbnail Section -->
+                {% if not video.has_specific_thumbnail %}
+                <button 
+                    hx-post="{{ url_for('generate_specific_thumbnail_endpoint', video_name=video.name) }}"
+                    hx-indicator="#thumbnail-spinner-{{ video.name | slugify_for_id }}"
+                    hx-target="#video-metadata-sidebar" 
+                    hx-swap="outerHTML"
+                    hx-on:htmx:after-request="
+                        if (event.detail.successful && event.detail.xhr.getResponseHeader('X-Thumbnail-Url')) {
+                            let player = document.getElementById('main-video-player');
+                            if (player) { 
+                                let newPosterUrl = event.detail.xhr.getResponseHeader('X-Thumbnail-Url');
+                                player.poster = newPosterUrl;
+                            }
+                            console.log('Thumbnail generated, sidebar reloaded, poster updated.');
+                        } else if (!event.detail.successful) {
+                            console.error('Thumbnail generation failed or X-Thumbnail-Url header missing.');
+                            let statusDiv = document.getElementById('thumbnail-status-message-{{ video.name | slugify_for_id }}');
+                            if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-2&quot;>Failed to get thumbnail URL from response. Sidebar did not reload.</p>';
+                        }
+                    "
+                    class="btn-base btn-secondary w-full bg-amber-600 hover:bg-amber-500 focus:ring-amber-500/60 text-sm py-2">
+                    <span id="thumbnail-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                    Generate Thumbnail
+                </button>
+                <div id="thumbnail-status-message-{{ video.name | slugify_for_id }}"></div>
                 {% else %}
-                <!-- Fallback message when video.id_db is not available -->
-                <div id="metadata-edit-form" class="hidden space-y-4 mb-6 p-4 bg-red-900/20 border border-red-600/50 rounded-lg">
-                    <div class="text-red-300 text-sm">
-                        <p class="font-semibold">Unable to Edit Metadata</p>
-                        <p class="text-xs mt-1">Video database ID is missing. This video may need to be rescanned.</p>
-                    </div>
-                    <button type="button" onclick="toggleEditMetadataMode(false)" class="btn-base bg-slate-600 text-slate-200 hover:bg-slate-500">
-                        Close
+                <div class="space-y-2">
+                    <p class="text-xs text-green-400">✓ Custom thumbnail is set</p>
+                    <button 
+                        hx-post="{{ url_for('delete_specific_thumbnail_endpoint', video_name=video.name) }}"
+                        hx-indicator="#thumbnail-delete-spinner-{{ video.name | slugify_for_id }}"
+                        hx-target="#video-metadata-sidebar" 
+                        hx-swap="outerHTML"
+                        hx-confirm="Are you sure you want to delete the custom thumbnail for this video? The default (first frame) will be used."
+                        hx-on:htmx:after-request="
+                            if (event.detail.successful) {
+                                let player = document.getElementById('main-video-player');
+                                if (player) { 
+                                    player.poster = '{{ url_for("static", path="icons/generic-video-icon.svg") }}';
+                                }
+                                console.log('Thumbnail deleted, sidebar reloaded, poster updated to default generic icon.');
+                            } else {
+                                 console.error('Thumbnail deletion failed.');
+                                 let statusDiv = document.getElementById('thumbnail-delete-status-{{ video.name | slugify_for_id }}');
+                                 if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete thumbnail. Sidebar did not reload.</p>';
+                            }
+                        "
+                        class="btn-base btn-destructive-secondary w-full text-sm py-2">
+                        <span id="thumbnail-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Delete Thumbnail
                     </button>
+                    <div id="thumbnail-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
                 </div>
                 {% endif %}
 
-                <div class="space-y-3 text-sm" id="system-details-section">
-                    <div class="flex justify-between">
-                        <span class="text-slate-400 font-medium">Duration:</span>
-                        <span class="text-slate-200">{{ video.duration }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400 font-medium">Resolution:</span>
-                        <span class="text-slate-200">{{ video.resolution }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400 font-medium">FPS:</span>
-                        <span class="text-slate-200">{{ video.fps }}</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400 font-medium">Size:</span>
-                        <span class="text-slate-200">{{ "%.2f" | format(video.size / (1024*1024)) }} MB</span>
-                    </div>
-                    <div class="flex justify-between">
-                        <span class="text-slate-400 font-medium">Path:</span>
-                        <span class="text-slate-200 overflow-hidden whitespace-nowrap text-ellipsis" title="{{ video.path }}">{{ video.path }}</span>
-                    </div>
-                </div>
-                
-                <div class="mt-8 space-y-4">
-                    {% if error_message %}
-                    <div class="p-3 mb-3 bg-red-700/30 border border-red-600/50 text-red-300 text-sm rounded-md" role="alert">
-                        <p class="font-semibold">Operation Note:</p>
-                        <p>{{ error_message }}</p>
-                    </div>
-                    {% endif %}
-
-                    <!-- Background Job Status Section for Video Sidebar -->
-                    <div id="video-background-jobs" class="hidden">
-                        <div class="bg-slate-700/50 p-4 rounded-lg border border-slate-600 mb-4">
-                            <div class="flex items-center justify-between mb-2">
-                                <h3 class="text-sm font-semibold text-slate-100 flex items-center">
-                                    <div class="w-2 h-2 bg-blue-400 rounded-full animate-pulse mr-2"></div>
-                                    Background Operations
-                                </h3>
-                                <button onclick="hideVideoJobs()" class="text-xs text-slate-400 hover:text-slate-300">✕</button>
-                            </div>
-                            <div id="video-jobs-container" class="space-y-2">
-                                <!-- Jobs will be inserted here -->
-                            </div>
-                        </div>
-                    </div>
-
-                    <a href="{{ video.original_path_for_download }}" download 
-                       class="btn-base btn-primary w-full">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2">
-                            <path d="M10.75 2.75a.75.75 0 00-1.5 0v8.614L6.295 8.235a.75.75 0 10-1.09 1.03l4.25 4.5a.75.75 0 001.09 0l4.25-4.5a.75.75 0 00-1.09-1.03l-2.955 3.129V2.75z" />
-                            <path d="M3.5 12.75a.75.75 0 00-1.5 0v2.5A2.75 2.75 0 004.75 18h10.5A2.75 2.75 0 0018 15.25v-2.5a.75.75 0 00-1.5 0v2.5c0 .69-.56 1.25-1.25 1.25H4.75c-.69 0-1.25-.56-1.25-1.25v-2.5z" />
-                        </svg>
-                        Download Original ({{ (video.size / (1024*1024)) | round(2) }} MB)
-                    </a>
-
-                    {% if not video.has_specific_thumbnail %}
+                <!-- Transcoding Section -->
+                {% if video.type == 'video' and not video.has_transcoded_version %}
+                <button 
+                    hx-post="{{ url_for('transcode_specific_video_endpoint', video_name=video.name) }}"
+                    hx-indicator="#transcode-spinner-{{ video.name | slugify_for_id }}"
+                    hx-target="#transcode-status-message-{{ video.name | slugify_for_id }}"
+                    hx-swap="innerHTML"
+                    hx-on:htmx:after-request="handleVideoJobStart(event)"
+                    class="btn-base btn-secondary w-full bg-sky-600 hover:bg-sky-500 focus:ring-sky-500/60 text-sm py-2">
+                    <span id="transcode-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                    Create Web-Optimized Version
+                </button>
+                <div id="transcode-status-message-{{ video.name | slugify_for_id }}" class="text-xs mt-2"></div>
+                {% elif video.type == 'video' and video.has_transcoded_version %}
+                <div class="space-y-2">
+                    <p class="text-xs text-green-400">✓ Web-optimized version exists</p>
                     <button 
-                        hx-post="{{ url_for('generate_specific_thumbnail_endpoint', video_name=video.name) }}"
-                        hx-indicator="#thumbnail-spinner-{{ video.name | slugify_for_id }}"
+                        hx-post="{{ url_for('delete_specific_transcoded_version_endpoint', video_name=video.name) }}"
+                        hx-indicator="#transcode-delete-spinner-{{ video.name | slugify_for_id }}"
                         hx-target="#video-metadata-sidebar" 
                         hx-swap="outerHTML"
+                        hx-confirm="Are you sure you want to delete the web-optimized version of this video?"
                         hx-on:htmx:after-request="
-                            if (event.detail.successful && event.detail.xhr.getResponseHeader('X-Thumbnail-Url')) {
-                                let player = document.getElementById('main-video-player');
-                                if (player) { 
-                                    let newPosterUrl = event.detail.xhr.getResponseHeader('X-Thumbnail-Url');
-                                    player.poster = newPosterUrl;
-                                }
-                                console.log('Thumbnail generated, sidebar reloaded, poster updated.');
-                            } else if (!event.detail.successful) {
-                                console.error('Thumbnail generation failed or X-Thumbnail-Url header missing.');
-                                let statusDiv = document.getElementById('thumbnail-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-2&quot;>Failed to get thumbnail URL from response. Sidebar did not reload.</p>';
+                            if (!event.detail.successful) {
+                                console.error('Transcoded version deletion failed.');
+                                let statusDiv = document.getElementById('transcode-delete-status-{{ video.name | slugify_for_id }}');
+                                if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete web-optimized version. Sidebar did not reload.</p>';
+                            } else {
+                                console.log('Web-optimized version deleted, sidebar reloaded.');
                             }
                         "
-                        class="btn-base btn-secondary w-full bg-amber-600 hover:bg-amber-500 focus:ring-amber-500/60">
-                        <span id="thumbnail-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                        Generate Thumbnail
+                        class="btn-base btn-destructive-secondary w-full text-sm py-2">
+                        <span id="transcode-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Delete Web-Optimized Version
                     </button>
-                    <div id="thumbnail-status-message-{{ video.name | slugify_for_id }}"></div>
-                    {% else %}
-                    <div class="mt-1 space-y-1">
-                        <p class="text-xs text-green-400">A custom thumbnail is set.</p>
-                        <button 
-                            hx-post="{{ url_for('delete_specific_thumbnail_endpoint', video_name=video.name) }}"
-                            hx-indicator="#thumbnail-delete-spinner-{{ video.name | slugify_for_id }}"
-                            hx-target="#video-metadata-sidebar" 
-                            hx-swap="outerHTML"
-                            hx-confirm="Are you sure you want to delete the custom thumbnail for this video? The default (first frame) will be used."
-                            hx-on:htmx:after-request="
-                                if (event.detail.successful) {
-                                    let player = document.getElementById('main-video-player');
-                                    if (player) { 
-                                        player.poster = '{{ url_for("static", path="icons/generic-video-icon.svg") }}'; // Set to generic icon
-                                    }
-                                    console.log('Thumbnail deleted, sidebar reloaded, poster updated to default generic icon.');
-                                } else {
-                                     console.error('Thumbnail deletion failed.');
-                                     let statusDiv = document.getElementById('thumbnail-delete-status-{{ video.name | slugify_for_id }}');
-                                     if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete thumbnail. Sidebar did not reload.</p>';
-                                }
-                            "
-                            class="btn-base btn-destructive-secondary w-full">
-                            <span id="thumbnail-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                            Delete Thumbnail
-                        </button>
-                        <div id="thumbnail-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
-                    </div>
-                    {% endif %}
+                    <div id="transcode-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
+                </div>
+                {% endif %}
 
-                    {% if video.type == 'video' and not video.has_transcoded_version %}
+                <!-- Preview Section -->
+                {% if video.type == 'video' and not video.has_preview %}
+                <button 
+                    hx-post="{{ url_for('generate_specific_preview_endpoint', video_name=video.name) }}"
+                    hx-indicator="#preview-spinner-{{ video.name | slugify_for_id }}"
+                    hx-target="#video-metadata-sidebar" 
+                    hx-swap="outerHTML"
+                    hx-on:htmx:after-request="
+                        if (event.detail.successful && event.detail.xhr.getResponseHeader('X-Preview-Url')) {
+                            console.log('Preview generated, sidebar reloaded.');
+                        } else if (!event.detail.successful) {
+                            console.error('Preview generation failed or X-Preview-Url header missing.');
+                            let statusDiv = document.getElementById('preview-status-message-{{ video.name | slugify_for_id }}');
+                            if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-2&quot;>Failed to generate preview. Sidebar did not reload.</p>';
+                        }
+                    "
+                    class="btn-base btn-secondary w-full bg-purple-600 hover:bg-purple-500 focus:ring-purple-500/60 text-sm py-2">
+                    <span id="preview-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                    Generate Hover Preview (5s)
+                </button>
+                <div id="preview-status-message-{{ video.name | slugify_for_id }}"></div>
+                {% elif video.type == 'video' and video.has_preview %}
+                <div class="space-y-2">
+                    <p class="text-xs text-green-400">✓ Hover preview (5s) exists</p>
                     <button 
-                        hx-post="{{ url_for('transcode_specific_video_endpoint', video_name=video.name) }}"
-                        hx-indicator="#transcode-spinner-{{ video.name | slugify_for_id }}"
-                        hx-target="#transcode-status-message-{{ video.name | slugify_for_id }}"
-                        hx-swap="innerHTML"
-                        hx-on:htmx:after-request="handleVideoJobStart(event)"
-                        class="btn-base btn-secondary w-full bg-sky-600 hover:bg-sky-500 focus:ring-sky-500/60">
-                        <span id="transcode-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                        Create Web-Optimized Version (MP4)
-                    </button>
-                    <div id="transcode-status-message-{{ video.name | slugify_for_id }}" class="text-xs mt-2"></div>
-                    {% elif video.type == 'video' and video.has_transcoded_version %}
-                    <div class="mt-1 space-y-1">
-                        <p class="text-xs text-green-400">A web-optimized version exists.</p>
-                        <button 
-                            hx-post="{{ url_for('delete_specific_transcoded_version_endpoint', video_name=video.name) }}"
-                            hx-indicator="#transcode-delete-spinner-{{ video.name | slugify_for_id }}"
-                            hx-target="#video-metadata-sidebar" 
-                            hx-swap="outerHTML"
-                            hx-confirm="Are you sure you want to delete the web-optimized version of this video?"
-                            hx-on:htmx:after-request="
-                                if (!event.detail.successful) {
-                                    console.error('Transcoded version deletion failed.');
-                                    let statusDiv = document.getElementById('transcode-delete-status-{{ video.name | slugify_for_id }}');
-                                    if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete web-optimized version. Sidebar did not reload.</p>';
-                                } else {
-                                    console.log('Web-optimized version deleted, sidebar reloaded.');
-                                }
-                            "
-                            class="btn-base btn-destructive-secondary w-full">
-                            <span id="transcode-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                            Delete Web-Optimized Version
-                        </button>
-                        <div id="transcode-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
-                    </div>
-                    {% endif %}
-
-                    {% if video.type == 'video' and not video.has_preview %}
-                    <button 
-                        hx-post="{{ url_for('generate_specific_preview_endpoint', video_name=video.name) }}"
-                        hx-indicator="#preview-spinner-{{ video.name | slugify_for_id }}"
+                        hx-post="{{ url_for('delete_specific_preview_endpoint', video_name=video.name) }}"
+                        hx-indicator="#preview-delete-spinner-{{ video.name | slugify_for_id }}"
                         hx-target="#video-metadata-sidebar" 
                         hx-swap="outerHTML"
+                        hx-confirm="Are you sure you want to delete the hover preview for this video?"
                         hx-on:htmx:after-request="
-                            if (event.detail.successful && event.detail.xhr.getResponseHeader('X-Preview-Url')) {
-                                console.log('Preview generated, sidebar reloaded.');
-                                // UI for preview is usually in a media gallery, not directly on player, so no direct DOM update here beyond reload.
-                            } else if (!event.detail.successful) {
-                                console.error('Preview generation failed or X-Preview-Url header missing.');
-                                let statusDiv = document.getElementById('preview-status-message-{{ video.name | slugify_for_id }}');
-                                if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-2&quot;>Failed to generate preview. Sidebar did not reload.</p>';
+                            if (!event.detail.successful) {
+                                console.error('Preview deletion failed.');
+                                let statusDiv = document.getElementById('preview-delete-status-{{ video.name | slugify_for_id }}');
+                                if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete preview. Sidebar did not reload.</p>';
+                            } else {
+                                console.log('Preview deleted, sidebar reloaded.');
                             }
                         "
-                        class="btn-base btn-secondary w-full bg-purple-600 hover:bg-purple-500 focus:ring-purple-500/60">
-                        <span id="preview-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                        Generate Hover Preview (5s)
+                        class="btn-base btn-destructive-secondary w-full text-sm py-2">
+                        <span id="preview-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Delete Hover Preview
                     </button>
-                    <div id="preview-status-message-{{ video.name | slugify_for_id }}"></div>
-                    {% elif video.type == 'video' and video.has_preview %}
-                    <div class="mt-1 space-y-1">
-                        <p class="text-xs text-green-400">A hover preview (5s) exists.</p>
-                        <button 
-                            hx-post="{{ url_for('delete_specific_preview_endpoint', video_name=video.name) }}"
-                            hx-indicator="#preview-delete-spinner-{{ video.name | slugify_for_id }}"
-                            hx-target="#video-metadata-sidebar" 
-                            hx-swap="outerHTML"
-                            hx-confirm="Are you sure you want to delete the hover preview for this video?"
-                            hx-on:htmx:after-request="
-                                if (!event.detail.successful) {
-                                    console.error('Preview deletion failed.');
-                                    let statusDiv = document.getElementById('preview-delete-status-{{ video.name | slugify_for_id }}');
-                                    if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete preview. Sidebar did not reload.</p>';
-                                } else {
-                                    console.log('Preview deleted, sidebar reloaded.');
-                                }
-                            "
-                            class="btn-base btn-destructive-secondary w-full">
-                            <span id="preview-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
-                            Delete Hover Preview
-                        </button>
-                        <div id="preview-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
-                    </div>
-                    {% endif %}
-
-                    <!-- Advanced Transcoding Button -->
-                    {% if video.type == 'video' %}
-                    <button 
-                        onclick="openAdvancedTranscodingModal()"
-                        class="btn-base btn-secondary w-full bg-indigo-600 hover:bg-indigo-500 focus:ring-indigo-500/60">
-                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 mr-2">
-                            <path fill-rule="evenodd" d="M11.828 2.25c-.916 0-1.699.663-1.85 1.567l-.091.549a.798.798 0 01-.517.608 7.45 7.45 0 00-.478.198.798.798 0 01-.796-.064l-.453-.324a1.875 1.875 0 00-2.416.2l-.243.243a1.875 1.875 0 00-.2 2.416l.324.453a.798.798 0 01.064.796l-.324.453a1.875 1.875 0 00.2 2.416l.243.243c.648.648 1.67.733 2.416.2l.453-.324a.798.798 0 01.796-.064c.157.071.316.137.478.198.267.1.47.327.517.608l.091.549a1.875 1.875 0 001.85 1.567h.344c.916 0 1.699-.663 1.85-1.567l.091-.549a.798.798 0 01.517-.608 7.52 7.52 0 00.478-.198.798.798 0 01.796.064l.453.324a1.875 1.875 0 002.416-.2l.243-.243c.648-.648.733-1.67.2-2.416l-.324-.453a.798.798 0 01-.064-.796c.071-.157.137-.316.198-.478.1-.267.327-.47.608-.517l.549-.091A1.875 1.875 0 0021.75 12.172v-.344c0-.916-.663-1.699-1.567-1.85l-.549-.091a.798.798 0 01-.608-.517 7.507 7.507 0 00-.198-.478.798.798 0 01.064-.796l.324-.453a1.875 1.875 0 00-.2-2.416l-.243-.243a1.875 1.875 0 00-2.416-.2l-.453.324a.798.798 0 01-.796.064 7.462 7.462 0 00-.478-.198.798.798 0 01-.517-.608l-.091-.549A1.875 1.875 0 0012.172 2.25h-.344zM12 15.75a3.75 3.75 0 100-7.5 3.75 3.75 0 000 7.5z" clip-rule="evenodd" />
-                        </svg>
-                        Advanced Transcoding Options
-                    </button>
-                    {% endif %}
-
-                    <!-- Delete Media File Button -->
-                    <div class="mt-6 pt-6 border-t border-slate-700">
-                        <button 
-                            hx-delete="{{ url_for('delete_media_file_endpoint', video_id_db=video.id_db) }}"
-                            hx-indicator="#delete-media-spinner-{{ video.name | slugify_for_id }}"
-                            hx-confirm="DANGER ZONE! Are you absolutely sure you want to delete this media file and all its associated assets (thumbnail, preview, transcoded versions)? This action cannot be undone."
-                            hx-target="body" 
-                            hx-swap="innerHTML" 
-                            hx-on:htmx:after-request="
-                                if (event.detail.successful) {
-                                    if (event.detail.xhr.status === 200 && event.detail.xhr.getResponseHeader('HX-Redirect')) {
-                                        console.log('Media file deletion successful, redirecting...');
-                                    } else if (event.detail.xhr.status === 200) {
-                                        console.log('Media file deletion successful. Attempting to redirect manually if no HX-Redirect.');
-                                        window.location.href = '/';
-                                    } else {
-                                        console.warn('Media file deletion reported success, but no redirect instruction received.');
-                                        let statusDiv = document.getElementById('delete-media-status-{{ video.name | slugify_for_id }}');
-                                        if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-green-400 text-xs mt-1&quot;>Deletion successful, but redirect failed. Please navigate manually.</p>';
-                                    }
-                                } else {
-                                    console.error('Media file deletion failed.', event.detail);
-                                    let statusDiv = document.getElementById('delete-media-status-{{ video.name | slugify_for_id }}');
-                                    if(statusDiv) {
-                                        let errorMessage = 'Failed to delete media file.';
-                                        if (event.detail.xhr && event.detail.xhr.responseText) {
-                                            try {
-                                                const errResponse = JSON.parse(event.detail.xhr.responseText);
-                                                if (errResponse.detail) errorMessage += ' Error: ' + errResponse.detail;
-                                            } catch (e) { /* Ignore if not JSON */ }
-                                        }
-                                        statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>' + errorMessage + '</p>';
-                                    } else {
-                                        alert('Failed to delete media file. Status container not found.');
-                                    }
-                                }
-                            "
-                            class="btn-base btn-destructive w-full">
-                            <span id="delete-media-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2 hidden"></span>
-                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 mr-2">
-                                <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75H4.75a.75.75 0 000 1.5H6V16.5a.75.75 0 00.75.75h6.5a.75.75 0 00.75-.75V5.25h1.25a.75.75 0 000-1.5H14A2.75 2.75 0 0011.25 1h-2.5zM10 4c.414 0 .75.336.75.75V15.5a.75.75 0 01-1.5 0V4.75A.75.75 0 0110 4zM8.25 5.25V15.5a.75.75 0 01-1.5 0V5.25a.75.75 0 011.5 0zm3.5 0V15.5a.75.75 0 01-1.5 0V5.25a.75.75 0 011.5 0z" clip-rule="evenodd" />
-                            </svg>
-                            Delete Media File
-                        </button>
-                        <div id="delete-media-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1 text-center"></div>
-                    </div>
+                    <div id="preview-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
                 </div>
+                {% endif %}
             </div>
+        </div>
+
+        <!-- Danger Zone Section -->
+        <div class="bg-red-900/20 border border-red-600/50 rounded-lg p-3">
+            <button onclick="toggleSection('danger-zone')" class="w-full flex items-center justify-between text-left mb-3">
+                <h3 class="text-sm font-medium text-red-300">Danger Zone</h3>
+                <svg id="danger-zone-chevron" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-red-400 transition-transform duration-200">
+                    <path fill-rule="evenodd" d="M5.22 8.22a.75.75 0 0 1 1.06 0L10 11.94l3.72-3.72a.75.75 0 1 1 1.06 1.06l-4.25 4.25a.75.75 0 0 1-1.06 0L5.22 9.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                </svg>
+            </button>
+            <div id="danger-zone-content" class="hidden">
+                <button 
+                    hx-delete="{{ url_for('delete_media_file_endpoint', video_id_db=video.id_db) }}"
+                    hx-indicator="#delete-media-spinner-{{ video.name | slugify_for_id }}"
+                    hx-confirm="DANGER ZONE! Are you absolutely sure you want to delete this media file and all its associated assets (thumbnail, preview, transcoded versions)? This action cannot be undone."
+                    hx-target="body" 
+                    hx-swap="innerHTML" 
+                    hx-on:htmx:after-request="
+                        if (event.detail.successful) {
+                            if (event.detail.xhr.status === 200 && event.detail.xhr.getResponseHeader('HX-Redirect')) {
+                                console.log('Media file deletion successful, redirecting...');
+                            } else if (event.detail.xhr.status === 200) {
+                                console.log('Media file deletion successful. Attempting to redirect manually if no HX-Redirect.');
+                                window.location.href = '/';
+                            } else {
+                                console.warn('Media file deletion reported success, but no redirect instruction received.');
+                                let statusDiv = document.getElementById('delete-media-status-{{ video.name | slugify_for_id }}');
+                                if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-green-400 text-xs mt-1&quot;>Deletion successful, but redirect failed. Please navigate manually.</p>';
+                            }
+                        } else {
+                            console.error('Media file deletion failed.', event.detail);
+                            let statusDiv = document.getElementById('delete-media-status-{{ video.name | slugify_for_id }}');
+                            if(statusDiv) {
+                                let errorMessage = 'Failed to delete media file.';
+                                if (event.detail.xhr && event.detail.xhr.responseText) {
+                                    try {
+                                        const errResponse = JSON.parse(event.detail.xhr.responseText);
+                                        if (errResponse.detail) errorMessage += ' Error: ' + errResponse.detail;
+                                    } catch (e) { /* Ignore if not JSON */ }
+                                }
+                                statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>' + errorMessage + '</p>';
+                            } else {
+                                alert('Failed to delete media file. Status container not found.');
+                            }
+                        }
+                    "
+                    class="btn-base btn-destructive w-full text-sm py-2">
+                    <span id="delete-media-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2 hidden"></span>
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 mr-2">
+                        <path fill-rule="evenodd" d="M8.75 1A2.75 2.75 0 006 3.75H4.75a.75.75 0 000 1.5H6V16.5a.75.75 0 00.75.75h6.5a.75.75 0 00.75-.75V5.25h1.25a.75.75 0 000-1.5H14A2.75 2.75 0 0011.25 1h-2.5zM10 4c.414 0 .75.336.75.75V15.5a.75.75 0 01-1.5 0V4.75A.75.75 0 0110 4zM8.25 5.25V15.5a.75.75 0 01-1.5 0V5.25a.75.75 0 011.5 0zm3.5 0V15.5a.75.75 0 01-1.5 0V5.25a.75.75 0 011.5 0z" clip-rule="evenodd" />
+                    </svg>
+                    Delete Media File
+                </button>
+                <div id="delete-media-status-{{ video.name | slugify_for_id }}" class="text-xs mt-2 text-center"></div>
+            </div>
+        </div>
+    </div>
 </div> 
