@@ -261,6 +261,21 @@ def get_media_files_from_db(
         tags_list = json.loads(row['tags']) if row['tags'] else []
         metadata = json.loads(row['metadata_json']) if row['metadata_json'] else {}
 
+        # Check ML analysis status for videos
+        has_ml_analysis = False
+        ml_analysis_info = {}
+        if row['media_type'] == 'video':
+            try:
+                from ml_processing import has_ml_analysis as check_ml_analysis, get_ml_analysis_info
+                has_ml_analysis = check_ml_analysis(row['id'])
+                if has_ml_analysis:
+                    ml_analysis_info = get_ml_analysis_info(row['id'])
+            except ImportError:
+                # ML processing module not available
+                pass
+            except Exception as e:
+                logger.warning(f"Error checking ML analysis for video {row['id']}: {e}")
+
         media_list.append({
             "id_db": row['id'],
             "name": row['filename'],
@@ -280,7 +295,9 @@ def get_media_files_from_db(
             "size_bytes": row['size_bytes'],
             "resolution": metadata.get('resolution', f"{row['width']}x{row['height']}" if row['width'] and row['height'] else None),
             "fps": metadata.get('fps', row['fps'] if row['fps'] else None),
-            "original_full_path": row['original_path']
+            "original_full_path": row['original_path'],
+            "has_ml_analysis": has_ml_analysis,
+            "ml_analysis_info": ml_analysis_info
         })
     
     # Calculate pagination info
@@ -381,12 +398,28 @@ def get_single_video_details_from_db(
                 # Determine thumbnail for queue items
                 q_thumbnail_url = f"/{v_row['thumbnail_path'].replace('\\\\ ', '/')}" if v_row['has_specific_thumbnail'] and v_row['thumbnail_path'] else "/static/icons/generic-video-icon.svg"
                 
+                # Check ML analysis status for queue items
+                q_has_ml_analysis = False
+                q_ml_analysis_info = {}
+                try:
+                    from ml_processing import has_ml_analysis as check_ml_analysis, get_ml_analysis_info
+                    q_has_ml_analysis = check_ml_analysis(v_row['id'])
+                    if q_has_ml_analysis:
+                        q_ml_analysis_info = get_ml_analysis_info(v_row['id'])
+                except ImportError:
+                    # ML processing module not available
+                    pass
+                except Exception as e:
+                    logger.warning(f"Error checking ML analysis for queue video {v_row['id']}: {e}")
+                
                 video_list.append({
                     "id_db": v_row['id'],
                     "name": v_row['filename'],
                     "display_title": v_row['user_title'] if v_row['user_title'] else v_row['filename'],
                     "thumbnail_url_or_generic": q_thumbnail_url, # Added for queue
-                    "duration_formatted": format_media_duration(v_row['duration']) # Added for queue
+                    "duration_formatted": format_media_duration(v_row['duration']), # Added for queue
+                    "has_ml_analysis": q_has_ml_analysis,
+                    "ml_analysis_info": q_ml_analysis_info
                 })
                 if v_row['id'] == row['id']:
                     current_video_index = i
@@ -405,6 +438,21 @@ def get_single_video_details_from_db(
     display_name = row['user_title'] if row['user_title'] else row['filename']
     tags_list = json.loads(row['tags']) if row['tags'] else []
     metadata = json.loads(row['metadata_json']) if row['metadata_json'] else {}
+
+    # Check ML analysis status for the current video
+    has_ml_analysis = False
+    ml_analysis_info = {}
+    if row['media_type'] == 'video':
+        try:
+            from ml_processing import has_ml_analysis as check_ml_analysis, get_ml_analysis_info
+            has_ml_analysis = check_ml_analysis(row['id'])
+            if has_ml_analysis:
+                ml_analysis_info = get_ml_analysis_info(row['id'])
+        except ImportError:
+            # ML processing module not available
+            pass
+        except Exception as e:
+            logger.warning(f"Error checking ML analysis for video {row['id']}: {e}")
 
     current_video_details = {
         "id_db": row['id'],
@@ -425,7 +473,9 @@ def get_single_video_details_from_db(
         "size": row['size_bytes'],
         "resolution": metadata.get('resolution', f"{row['width']}x{row['height']}" if row['width'] and row['height'] else 'N/A'),
         "fps": metadata.get('fps', row['fps'] if row['fps'] else 'N/A'),
-        "original_full_path": row['original_path']
+        "original_full_path": row['original_path'],
+        "has_ml_analysis": has_ml_analysis,
+        "ml_analysis_info": ml_analysis_info
     }
 
     return current_video_details, video_list, next_video # Return current video, queue, and next video

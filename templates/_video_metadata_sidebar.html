@@ -322,6 +322,78 @@
                     <div id="preview-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
                 </div>
                 {% endif %}
+
+                <!-- ML Analysis Section -->
+                {% if video.type == 'video' and not video.has_ml_analysis %}
+                <a href="{{ url_for('ml_processing_page') }}" 
+                   class="btn-base btn-secondary w-full bg-blue-600 hover:bg-blue-500 focus:ring-blue-500/60 text-sm py-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-4 h-4 mr-2">
+                        <path d="M8 2L2 7l6 5 6-5-6-5zM2 12l6 5 6-5M2 9l6 5 6-5"/>
+                    </svg>
+                    Generate ML Analysis
+                </a>
+                {% elif video.type == 'video' and video.has_ml_analysis %}
+                <div class="space-y-2">
+                    <div class="flex items-center justify-between">
+                        <p class="text-xs text-blue-400 flex items-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3 mr-1">
+                                <path d="M8 2L2 7l6 5 6-5-6-5zM2 12l6 5 6-5M2 9l6 5 6-5"/>
+                            </svg>
+                            ✓ ML Analysis Available
+                        </p>
+                        <a href="{{ url_for('ml_processing_page') }}" 
+                           class="text-xs text-blue-400 hover:text-blue-300 underline">
+                            View/Manage
+                        </a>
+                    </div>
+                    {% if video.ml_analysis_info %}
+                    <div class="text-xs text-slate-400 space-y-1">
+                        <div class="flex justify-between">
+                            <span>Frames processed:</span>
+                            <span class="text-slate-300">{{ video.ml_analysis_info.frame_count or 0 }}</span>
+                        </div>
+                        <div class="flex justify-between">
+                            <span>Model used:</span>
+                            <span class="text-slate-300">{{ video.ml_analysis_info.model_name or 'Unknown' }}</span>
+                        </div>
+                        {% if video.ml_analysis_info.processed_at %}
+                        <div class="flex justify-between">
+                            <span>Processed:</span>
+                            <span class="text-slate-300">{{ video.ml_analysis_info.processed_at[:10] if video.ml_analysis_info.processed_at else 'Unknown' }}</span>
+                        </div>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                    <button 
+                        hx-delete="/ml/video/{{ video.id_db }}/ml-analysis"
+                        hx-indicator="#ml-delete-spinner-{{ video.name | slugify_for_id }}"
+                        hx-target="#video-metadata-sidebar" 
+                        hx-swap="outerHTML"
+                        hx-confirm="Are you sure you want to delete the ML analysis data for this video? This will remove all processed frames and embeddings. This action cannot be undone."
+                        hx-on:htmx:after-request="
+                            if (event.detail.successful) {
+                                console.log('ML analysis deleted, sidebar reloaded.');
+                                // Show success toast notification
+                                if (typeof showToast === 'function') {
+                                    showToast('ML analysis data deleted successfully', 'success');
+                                }
+                            } else {
+                                console.error('ML analysis deletion failed.');
+                                let statusDiv = document.getElementById('ml-delete-status-{{ video.name | slugify_for_id }}');
+                                if(statusDiv) statusDiv.innerHTML = '<p class=&quot;text-red-400 text-xs mt-1&quot;>Failed to delete ML analysis data.</p>';
+                                // Show error toast notification
+                                if (typeof showToast === 'function') {
+                                    showToast('Failed to delete ML analysis data', 'error');
+                                }
+                            }
+                        "
+                        class="btn-base btn-destructive-secondary w-full text-sm py-2">
+                        <span id="ml-delete-spinner-{{ video.name | slugify_for_id }}" class="htmx-indicator animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        Delete ML Analysis
+                    </button>
+                    <div id="ml-delete-status-{{ video.name | slugify_for_id }}" class="text-xs mt-1"></div>
+                </div>
+                {% endif %}
             </div>
         </div>
 

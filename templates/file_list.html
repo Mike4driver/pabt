@@ -34,6 +34,15 @@
         <span class="absolute top-2 left-2 bg-green-500/80 text-white text-xs px-1.5 py-0.5 rounded-sm font-medium">Transcoded</span>
         {% endif %}
         
+        {% if file.type == 'video' and file.has_ml_analysis %}
+        <span class="absolute top-2 {% if file.has_transcoded_version %}left-20{% else %}left-2{% endif %} bg-blue-500/80 text-white text-xs px-1.5 py-0.5 rounded-sm font-medium flex items-center" title="ML Analysis: {{ file.ml_analysis_info.frame_count }} frames processed with {{ file.ml_analysis_info.model_name }}">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3 mr-1">
+                <path d="M8 2L2 7l6 5 6-5-6-5zM2 12l6 5 6-5M2 9l6 5 6-5"/>
+            </svg>
+            ML
+        </span>
+        {% endif %}
+        
         {% if file.type == 'audio' %}
             <div class="absolute inset-0 flex items-center justify-center">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-16 h-16 text-slate-500 opacity-50">

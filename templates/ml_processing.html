@@ -1,0 +1,1050 @@
+<!DOCTYPE html>
+<html lang="en" class="h-full">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>ML Video Processing - Media Browser</title>
+    <script src="https://unpkg.com/htmx.org@1.9.10"></script>
+    <script defer src="https://cdn.jsdelivr.net/npm/alpinejs@3.x.x/dist/cdn.min.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            theme: {
+                extend: {
+                    colors: {
+                        primary: '#1a73e8',
+                        slate: {
+                            50: '#f8fafc',
+                            100: '#f1f5f9',
+                            200: '#e2e8f0',
+                            300: '#cbd5e1',
+                            400: '#94a3b8',
+                            500: '#64748b',
+                            600: '#475569',
+                            700: '#334155',
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+    <style>
+        .btn-base {
+            font-weight: 600;
+            padding: 0.625rem 1.25rem;
+            border-radius: 0.5rem;
+            outline: none;
+            transition: all 0.2s;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 0.875rem;
+            box-shadow: 0 1px 2px 0 rgba(0, 0, 0, 0.05);
+            border: none;
+            cursor: pointer;
+            text-decoration: none;
+        }
+        .btn-primary {
+            background-color: #1a73e8;
+            color: white;
+        }
+        .btn-primary:hover {
+            background-color: rgba(26, 115, 232, 0.9);
+        }
+        .btn-primary:disabled {
+            background-color: #94a3b8;
+            cursor: not-allowed;
+        }
+        .btn-secondary {
+            background-color: #475569;
+            color: white;
+        }
+        .btn-secondary:hover {
+            background-color: #64748b;
+        }
+        
+        /* Video item thumbnail styles */
+        .video-item img {
+            transition: all 0.2s ease;
+        }
+        
+        .video-item:hover img {
+            transform: scale(1.02);
+            border-color: #64748b;
+        }
+        
+        .video-item.selected img {
+            border-color: #1a73e8;
+            box-shadow: 0 0 0 1px rgba(26, 115, 232, 0.3);
+        }
+    </style>
+</head>
+<body class="bg-slate-900 text-slate-200 h-full flex flex-col font-sans">
+    <header class="bg-slate-800 flex-shrink-0 z-50 border-b border-slate-700 shadow-lg">
+        <div class="max-w-screen-2xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center h-16">
+                <!-- Brand/Logo -->
+                <div class="flex-shrink-0">
+                    <a href="/" class="text-xl font-bold text-white hover:text-primary transition-colors duration-200 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 mr-2 text-primary">
+                            <path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/>
+                        </svg>
+                        ML Video Processing
+                    </a>
+                </div>
+
+                <!-- Navigation -->
+                <div class="flex items-center space-x-4">
+                    <a href="/" class="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                        Media Browser
+                    </a>
+                    <a href="{{ url_for('tools_page') }}" class="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                        Processing Tools
+                    </a>
+                    <a href="{{ url_for('background_jobs_page') }}" class="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                        Background Jobs
+                    </a>
+                    <a href="{{ url_for('settings_page') }}" class="text-slate-300 hover:text-white px-3 py-2 rounded-md text-sm font-medium transition-colors duration-200">
+                        Settings
+                    </a>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex-1 overflow-auto">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <!-- Page Header -->
+            <div class="mb-8">
+                <h1 class="text-3xl font-bold text-slate-100 mb-2">ML Video Processing</h1>
+                <p class="text-slate-400">Extract frames from videos and generate embeddings using machine learning models</p>
+            </div>
+
+            <!-- Main Content -->
+            <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <!-- Video Selection Panel -->
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-6">
+                    <h2 class="text-xl font-semibold text-slate-100 mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 mr-2 text-primary">
+                            <path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0119.5 6v6a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 12V6zM3 16.06V18a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" />
+                        </svg>
+                        Select Video
+                    </h2>
+                    
+                    <!-- Search Input -->
+                    <div class="mb-4">
+                        <div class="relative">
+                            <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-400">
+                                    <path fill-rule="evenodd" d="M9 3.5a5.5 5.5 0 100 11 5.5 5.5 0 000-11zM2 9a7 7 0 1112.452 4.391l3.328 3.329a.75.75 0 11-1.06 1.06l-3.329-3.328A7 7 0 012 9z" clip-rule="evenodd" />
+                                </svg>
+                            </div>
+                            <input type="text" 
+                                   id="video-search-input" 
+                                   placeholder="Search videos by title or filename..." 
+                                   class="w-full pl-10 pr-4 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary transition-colors duration-200"
+                                   oninput="filterVideos(this.value)">
+                            <div id="search-clear-btn" class="absolute inset-y-0 right-0 pr-3 flex items-center cursor-pointer hidden" onclick="clearVideoSearch()">
+                                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4 text-slate-400 hover:text-slate-200">
+                                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                </svg>
+                            </div>
+                        </div>
+                        
+                        <!-- Search Results Summary -->
+                        <div id="search-results-summary" class="mt-2 text-xs text-slate-400 hidden">
+                            <span id="results-count">0</span> videos found
+                        </div>
+                    </div>
+                    
+                    <!-- Sorting Controls -->
+                    <div class="mb-4 grid grid-cols-2 gap-3">
+                        <div>
+                            <label for="sort-by-select" class="block text-xs font-medium text-slate-400 mb-1">Sort By</label>
+                            <select id="sort-by-select" 
+                                    class="w-full text-sm bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                                    onchange="updateVideoSorting()">
+                                <option value="date_added">Date Added</option>
+                                <option value="filename">Filename</option>
+                                <option value="user_title">Title</option>
+                                <option value="duration">Duration</option>
+                                <option value="size_bytes">File Size</option>
+                                <option value="media_type">Media Type</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label for="sort-order-select" class="block text-xs font-medium text-slate-400 mb-1">Sort Order</label>
+                            <select id="sort-order-select" 
+                                    class="w-full text-sm bg-slate-700 border border-slate-600 text-slate-200 rounded-md px-3 py-2 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary"
+                                    onchange="updateVideoSorting()">
+                                <option value="desc">Descending</option>
+                                <option value="asc">Ascending</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Video List -->
+                    <div id="video-list-container" class="mb-6">
+                        <div id="video-list" class="space-y-2 max-h-96 overflow-y-auto custom-scrollbar">
+                            <div class="text-center py-4">
+                                <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto"></div>
+                                <p class="text-slate-400 mt-2">Loading videos...</p>
+                            </div>
+                        </div>
+                        
+                        <!-- No Results Message -->
+                        <div id="no-results-message" class="text-center py-8 text-slate-400 hidden">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-12 h-12 mx-auto mb-3 opacity-50">
+                                <path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 100 13.5 6.75 6.75 0 000-13.5zM2.25 10.5a8.25 8.25 0 1114.59 5.28l4.69 4.69a.75.75 0 11-1.06 1.06l-4.69-4.69A8.25 8.25 0 012.25 10.5z" clip-rule="evenodd" />
+                            </svg>
+                            <p class="text-lg font-medium mb-1">No videos found</p>
+                            <p class="text-sm">Try adjusting your search terms</p>
+                        </div>
+                    </div>
+
+                    <!-- Processing Form -->
+                    <form id="processing-form" class="space-y-4" style="display: none;">
+                        <input type="hidden" id="selected-video-id" name="video_id">
+                        
+                        <div>
+                            <label for="frame-interval" class="block text-sm font-medium text-slate-300 mb-2">
+                                Frame Interval
+                                <span class="text-slate-500">(extract every Nth frame)</span>
+                            </label>
+                            <select id="frame-interval" name="frame_interval" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                                <option value="30">Every 30th frame (~1 per second)</option>
+                                <option value="60">Every 60th frame (~1 per 2 seconds)</option>
+                                <option value="100" selected>Every 100th frame (~1 per 3 seconds)</option>
+                                <option value="150">Every 150th frame (~1 per 5 seconds)</option>
+                                <option value="300">Every 300th frame (~1 per 10 seconds)</option>
+                            </select>
+                        </div>
+
+                        <div>
+                            <label for="model-name" class="block text-sm font-medium text-slate-300 mb-2">
+                                ML Model
+                                <span class="text-slate-500">(for generating embeddings)</span>
+                            </label>
+                            <select id="model-name" name="model_name" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200 focus:outline-none focus:ring-2 focus:ring-primary focus:border-primary">
+                                <option value="clip-ViT-B-32" selected>CLIP ViT-B/32 (Recommended)</option>
+                                <option value="clip-ViT-L-14">CLIP ViT-L/14 (Larger, slower)</option>
+                                <option value="clip-ViT-B-16">CLIP ViT-B/16 (Alternative)</option>
+                            </select>
+                        </div>
+
+                        <button type="submit" id="start-processing-btn" class="btn-base btn-primary w-full">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 mr-2">
+                                <path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" />
+                            </svg>
+                            Start Frame Processing
+                        </button>
+                    </form>
+                </div>
+
+                <!-- Status and Results Panel -->
+                <div class="bg-slate-800 rounded-lg border border-slate-700 p-6">
+                    <h2 class="text-xl font-semibold text-slate-100 mb-4 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 mr-2 text-primary">
+                            <path fill-rule="evenodd" d="M2.25 13.5a8.25 8.25 0 018.25-8.25.75.75 0 01.75.75v6.75H18a.75.75 0 01.75.75 8.25 8.25 0 01-16.5 0z" clip-rule="evenodd" />
+                            <path fill-rule="evenodd" d="M12.75 3a.75.75 0 01.75-.75 8.25 8.25 0 018.25 8.25.75.75 0 01-.75.75h-7.5V3z" clip-rule="evenodd" />
+                        </svg>
+                        Processing Status
+                    </h2>
+
+                    <!-- Processing Status -->
+                    <div id="processing-status" class="mb-6">
+                        <div class="text-center py-8 text-slate-400">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-12 h-12 mx-auto mb-3 opacity-50">
+                                <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd" />
+                            </svg>
+                            <p>Select a video to start processing</p>
+                        </div>
+                    </div>
+
+                    <!-- Analysis Results -->
+                    <div id="analysis-results" style="display: none;">
+                        <h3 class="text-lg font-medium text-slate-200 mb-3">Analysis Results</h3>
+                        <div id="results-content" class="space-y-3">
+                            <!-- Results will be populated here -->
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Background Jobs Section -->
+            <div id="ml-background-jobs" class="mt-8 bg-slate-800 rounded-lg border border-slate-700 p-6" style="display: none;">
+                <div class="flex items-center justify-between mb-4">
+                    <h2 class="text-xl font-semibold text-slate-100 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 mr-2 text-primary">
+                            <path fill-rule="evenodd" d="M4.755 10.059a7.5 7.5 0 0112.548-3.364l1.903 1.903h-3.183a.75.75 0 100 1.5h4.992a.75.75 0 00.75-.75V4.356a.75.75 0 00-1.5 0v3.18l-1.9-1.9A9 9 0 003.306 9.67a.75.75 0 101.45.388zm15.408 3.352a.75.75 0 00-.919.53 7.5 7.5 0 01-12.548 3.364l-1.902-1.903h3.183a.75.75 0 000-1.5H2.984a.75.75 0 00-.75.75v4.992a.75.75 0 001.5 0v-3.18l1.9 1.9a9 9 0 0015.059-4.035.75.75 0 00-.53-.918z" clip-rule="evenodd" />
+                        </svg>
+                        Active ML Jobs
+                    </h2>
+                    <button onclick="hideMlJobs()" class="text-slate-400 hover:text-slate-200 text-sm">
+                        Hide
+                    </button>
+                </div>
+                <div id="ml-jobs-container" class="space-y-3">
+                    <!-- Jobs will be populated here -->
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Toast Notification Container -->
+    <div id="toast-container" class="fixed bottom-0 right-0 p-6 space-y-3 z-[100]">
+        <!-- Toasts will be appended here -->
+    </div>
+
+    <script>
+        let mlActiveJobs = new Set();
+        let mlJobPollingInterval = null;
+        let previousMlJobStates = new Map();
+        let allVideos = []; // Store all videos for filtering
+        let filteredVideos = []; // Store currently filtered videos
+        let currentSortBy = 'date_added'; // Current sort field
+        let currentSortOrder = 'desc'; // Current sort order
+
+        // Load videos on page load
+        document.addEventListener('DOMContentLoaded', function() {
+            // Load saved sorting preferences
+            loadSortingPreferences();
+            
+            loadVideos();
+            refreshMlJobs();
+            
+            // Add keyboard support for search
+            const searchInput = document.getElementById('video-search-input');
+            searchInput.addEventListener('keydown', function(event) {
+                if (event.key === 'Escape') {
+                    clearVideoSearch();
+                } else if (event.key === 'Enter') {
+                    // If there's exactly one result, select it
+                    if (filteredVideos.length === 1) {
+                        const video = filteredVideos[0];
+                        selectVideo(video.id, video.display_title, video.filename);
+                    }
+                }
+            });
+        });
+
+        async function loadVideos() {
+            try {
+                const url = `/ml/api/videos-for-ml?sort_by=${currentSortBy}&sort_order=${currentSortOrder}`;
+                const response = await fetch(url);
+                const data = await response.json();
+                
+                // Store all videos for filtering
+                allVideos = data.videos;
+                filteredVideos = [...allVideos]; // Initially show all videos
+                
+                if (allVideos.length === 0) {
+                    showEmptyState();
+                    return;
+                }
+                
+                // Render the videos
+                renderVideoList(filteredVideos);
+                updateSearchSummary();
+                
+            } catch (error) {
+                console.error('Error loading videos:', error);
+                document.getElementById('video-list').innerHTML = `
+                    <div class="text-center py-8 text-red-400">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-12 h-12 mx-auto mb-3 opacity-50">
+                            <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd" />
+                        </svg>
+                        <p class="text-lg font-medium mb-1">Error loading videos</p>
+                        <p class="text-sm">Please try refreshing the page</p>
+                    </div>
+                `;
+            }
+        }
+
+        function renderVideoList(videos) {
+            const videoList = document.getElementById('video-list');
+            const noResultsMessage = document.getElementById('no-results-message');
+            
+            if (videos.length === 0) {
+                videoList.classList.add('hidden');
+                noResultsMessage.classList.remove('hidden');
+                return;
+            }
+            
+            videoList.classList.remove('hidden');
+            noResultsMessage.classList.add('hidden');
+            
+            videoList.innerHTML = videos.map(video => `
+                <div class="video-item p-3 bg-slate-700 rounded-lg border border-slate-600 cursor-pointer hover:bg-slate-600 transition-colors duration-200" 
+                     onclick="selectVideo(${video.id}, '${escapeHtml(video.display_title)}', '${escapeHtml(video.filename)}')"
+                     data-video-id="${video.id}"
+                     data-search-text="${escapeHtml(video.display_title.toLowerCase() + ' ' + video.filename.toLowerCase())}">
+                    <div class="flex items-start space-x-3">
+                        <!-- Thumbnail -->
+                        <div class="flex-shrink-0 relative">
+                            <img src="${video.thumbnail}" 
+                                 alt="Thumbnail for ${escapeHtml(video.display_title)}" 
+                                 class="w-20 h-12 object-cover rounded border border-slate-600 bg-slate-800"
+                                 onerror="this.src='/static/icons/generic-video-icon.svg'; this.classList.add('p-2');">
+                            ${video.has_ml_analysis ? `
+                                <span class="absolute -top-1 -right-1 bg-blue-500 text-white text-xs px-1 py-0.5 rounded-full font-medium flex items-center" title="ML Analysis: ${video.ml_analysis_info.frame_count || 0} frames processed">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-2.5 h-2.5">
+                                        <path d="M8 2L2 7l6 5 6-5-6-5zM2 12l6 5 6-5M2 9l6 5 6-5"/>
+                                    </svg>
+                                </span>
+                            ` : ''}
+                        </div>
+                        
+                        <!-- Video Info -->
+                        <div class="flex-1 min-w-0">
+                            <h3 class="text-sm font-medium text-slate-200 truncate leading-tight">${escapeHtml(video.display_title)}</h3>
+                            <p class="text-xs text-slate-400 mt-1 truncate">${escapeHtml(video.filename)}</p>
+                            <div class="flex items-center space-x-3 mt-2 text-xs text-slate-500">
+                                ${video.duration ? `<span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 mr-1">
+                                        <path fill-rule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zM9.555 7.168A1 1 0 008 8v4a1 1 0 001.555.832l3-2a1 1 0 000-1.664l-3-2z" clip-rule="evenodd" />
+                                    </svg>
+                                    ${formatDuration(video.duration)}
+                                </span>` : ''}
+                                <span class="flex items-center">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-3 h-3 mr-1">
+                                        <path fill-rule="evenodd" d="M4.5 2A1.5 1.5 0 003 3.5v13A1.5 1.5 0 004.5 18h11a1.5 1.5 0 001.5-1.5v-13A1.5 1.5 0 0015.5 2h-11zm4.5 6.5a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0zm2.5 4a.5.5 0 01-.5.5h-5a.5.5 0 01-.5-.5v-.5c0-.828.672-1.5 1.5-1.5h3c.828 0 1.5.672 1.5 1.5v.5z" clip-rule="evenodd" />
+                                    </svg>
+                                    ${video.size_mb} MB
+                                </span>
+                            </div>
+                        </div>
+                        
+                        <!-- Selection Arrow -->
+                        <div class="flex-shrink-0 self-center">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 text-slate-400">
+                                <path fill-rule="evenodd" d="M16.28 11.47a.75.75 0 010 1.06l-7.5 7.5a.75.75 0 01-1.06-1.06L14.69 12 7.72 5.03a.75.75 0 011.06-1.06l7.5 7.5z" clip-rule="evenodd" />
+                            </svg>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function showEmptyState() {
+            const videoList = document.getElementById('video-list');
+            videoList.innerHTML = `
+                <div class="text-center py-8 text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-12 h-12 mx-auto mb-3 opacity-50">
+                        <path fill-rule="evenodd" d="M1.5 6a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0119.5 6v6a2.25 2.25 0 01-2.25 2.25H3.75A2.25 2.25 0 011.5 12V6zM3 16.06V18a2.25 2.25 0 002.25 2.25h13.5A2.25 2.25 0 0021 18v-1.94l-2.69-2.689a1.5 1.5 0 00-2.12 0l-.88.879.97.97a.75.75 0 11-1.06 1.06l-5.16-5.159a1.5 1.5 0 00-2.12 0L3 16.061zm10.125-7.81a1.125 1.125 0 112.25 0 1.125 1.125 0 01-2.25 0z" clip-rule="evenodd" />
+                    </svg>
+                    <p class="text-lg font-medium mb-1">No videos available</p>
+                    <p class="text-sm">Add some videos to your media directory to get started</p>
+                </div>
+            `;
+        }
+
+        function selectVideo(videoId, title, filename) {
+            // Update UI to show selected video
+            document.querySelectorAll('.video-item').forEach(item => {
+                item.classList.remove('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
+            });
+            
+            const selectedItem = document.querySelector(`[data-video-id="${videoId}"]`);
+            selectedItem.classList.add('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
+            
+            // Show processing form
+            document.getElementById('selected-video-id').value = videoId;
+            document.getElementById('processing-form').style.display = 'block';
+            
+            // Update status
+            document.getElementById('processing-status').innerHTML = `
+                <div class="bg-slate-700 rounded-lg p-4">
+                    <h4 class="text-sm font-medium text-slate-200 mb-2">Selected Video</h4>
+                    <p class="text-slate-300">${title}</p>
+                    <p class="text-xs text-slate-400 mt-1">${filename}</p>
+                </div>
+            `;
+            
+            // Check if analysis already exists
+            checkExistingAnalysis(videoId);
+        }
+
+        async function checkExistingAnalysis(videoId) {
+            try {
+                const response = await fetch(`/ml/video/${videoId}/frame-analysis`);
+                const data = await response.json();
+                
+                if (data.has_analysis) {
+                    showAnalysisResults(data);
+                }
+            } catch (error) {
+                console.error('Error checking existing analysis:', error);
+            }
+        }
+
+        function showAnalysisResults(data) {
+            const resultsDiv = document.getElementById('analysis-results');
+            const resultsContent = document.getElementById('results-content');
+            
+            resultsContent.innerHTML = `
+                <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-4">
+                    <div class="flex items-center mb-2">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 text-green-400 mr-2">
+                            <path fill-rule="evenodd" d="M2.25 13.5a8.25 8.25 0 018.25-8.25.75.75 0 01.75.75v6.75H18a.75.75 0 01.75.75 8.25 8.25 0 01-16.5 0z" clip-rule="evenodd" />
+                        </svg>
+                        <h4 class="text-sm font-medium text-green-400">Analysis Complete</h4>
+                    </div>
+                    <div class="text-sm text-slate-300 space-y-1">
+                        <p><strong>Frames processed:</strong> ${data.frame_count}</p>
+                        <p><strong>Model used:</strong> ${data.model_used}</p>
+                        <p><strong>Processed:</strong> ${new Date(data.processed_at).toLocaleString()}</p>
+                    </div>
+                </div>
+            `;
+            
+            resultsDiv.style.display = 'block';
+        }
+
+        // Handle form submission
+        document.getElementById('processing-form').addEventListener('submit', async function(e) {
+            e.preventDefault();
+            
+            const formData = new FormData(this);
+            const startBtn = document.getElementById('start-processing-btn');
+            
+            startBtn.disabled = true;
+            startBtn.innerHTML = `
+                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                Starting...
+            `;
+            
+            try {
+                const response = await fetch('/ml/process-video-frames', {
+                    method: 'POST',
+                    body: formData
+                });
+                
+                const data = await response.json();
+                
+                if (response.ok) {
+                    // Add job to monitoring
+                    mlActiveJobs.add(data.job_id);
+                    showMlJobsSection();
+                    startMlJobPolling();
+                    
+                    showToast(data.message, 'Frame processing started', 'info');
+                    
+                    // Update status
+                    document.getElementById('processing-status').innerHTML = `
+                        <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-4">
+                            <div class="flex items-center mb-2">
+                                <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-blue-400 mr-2"></div>
+                                <h4 class="text-sm font-medium text-blue-400">Processing Started</h4>
+                            </div>
+                            <p class="text-sm text-slate-300">${data.message}</p>
+                        </div>
+                    `;
+                } else {
+                    showToast(data.detail || 'Failed to start processing', 'Processing Error', 'error');
+                }
+            } catch (error) {
+                console.error('Error starting processing:', error);
+                showToast('Network error occurred', 'Processing Error', 'error');
+            } finally {
+                startBtn.disabled = false;
+                startBtn.innerHTML = `
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-4 h-4 mr-2">
+                        <path fill-rule="evenodd" d="M4.5 5.653c0-1.426 1.529-2.33 2.779-1.643l11.54 6.348c1.295.712 1.295 2.573 0 3.285L7.28 19.991c-1.25.687-2.779-.217-2.779-1.643V5.653z" clip-rule="evenodd" />
+                    </svg>
+                    Start Frame Processing
+                `;
+            }
+        });
+
+        // Background job monitoring
+        function showMlJobsSection() {
+            document.getElementById('ml-background-jobs').style.display = 'block';
+        }
+
+        function hideMlJobs() {
+            document.getElementById('ml-background-jobs').style.display = 'none';
+        }
+
+        function startMlJobPolling() {
+            if (mlJobPollingInterval) return;
+            
+            mlJobPollingInterval = setInterval(() => {
+                if (mlActiveJobs.size === 0) {
+                    stopMlJobPolling();
+                    return;
+                }
+                refreshMlJobs();
+            }, 2000);
+        }
+
+        function stopMlJobPolling() {
+            if (mlJobPollingInterval) {
+                clearInterval(mlJobPollingInterval);
+                mlJobPollingInterval = null;
+            }
+        }
+
+        function refreshMlJobs() {
+            fetch('/jobs')
+                .then(response => response.json())
+                .then(data => {
+                    const relevantJobs = data.jobs.filter(job => 
+                        mlActiveJobs.has(job.job_id) || 
+                        previousMlJobStates.has(job.job_id) ||
+                        job.job_type === 'video_frame_processing'
+                    );
+                    updateMlJobsDisplay(relevantJobs);
+                    checkForMlCompletedJobsAndNotify(relevantJobs);
+                })
+                .catch(error => {
+                    console.error('Error fetching ML jobs:', error);
+                });
+        }
+
+        function updateMlJobsDisplay(jobs) {
+            const container = document.getElementById('ml-jobs-container');
+            
+            if (jobs.length === 0) {
+                mlActiveJobs.clear();
+                stopMlJobPolling();
+                setTimeout(() => {
+                    if (mlActiveJobs.size === 0) {
+                        hideMlJobs();
+                    }
+                }, 2000);
+                return;
+            }
+
+            mlActiveJobs.clear();
+            jobs.forEach(job => {
+                if (job.status === 'running') {
+                    mlActiveJobs.add(job.job_id);
+                }
+            });
+
+            container.innerHTML = jobs.map(job => createMlJobElement(job)).join('');
+            
+            if (mlActiveJobs.size === 0) {
+                setTimeout(() => {
+                    if (mlActiveJobs.size === 0) {
+                        stopMlJobPolling();
+                    }
+                }, 5000);
+            }
+        }
+
+        function checkForMlCompletedJobsAndNotify(newJobs) {
+            newJobs.forEach(job => {
+                const previousState = previousMlJobStates.get(job.job_id);
+                if (previousState === 'running' && (job.status === 'completed' || job.status === 'failed')) {
+                    showToast(
+                        job.result?.message || job.error || `Job ${job.status}`, 
+                        job.description, 
+                        job.status === 'completed' ? 'success' : 'error'
+                    );
+                    
+                    // Clear the "Processing Started" message when job completes
+                    clearProcessingStatus();
+                    
+                    // If completed successfully, refresh the video list to show ML indicator
+                    if (job.status === 'completed' && job.result?.video_id) {
+                        checkExistingAnalysis(job.result.video_id);
+                        // Refresh the video list to show the new ML analysis indicator
+                        refreshVideoListAfterProcessing(job.result.video_id);
+                    }
+                }
+                previousMlJobStates.set(job.job_id, job.status);
+            });
+
+            const currentJobIds = new Set(newJobs.map(j => j.job_id));
+            for (const jobId of previousMlJobStates.keys()) {
+                if (!currentJobIds.has(jobId)) {
+                    previousMlJobStates.delete(jobId);
+                }
+            }
+        }
+
+        function createMlJobElement(job) {
+            const progressPercent = job.total > 0 ? Math.round((job.progress / job.total) * 100) : 0;
+            const statusColor = {
+                'running': 'text-blue-400',
+                'completed': 'text-green-400',
+                'failed': 'text-red-400'
+            }[job.status] || 'text-slate-400';
+
+            const statusIcon = {
+                'running': '🔄',
+                'completed': '✅',
+                'failed': '❌'
+            }[job.status] || '⏳';
+
+            return `
+                <div class="bg-slate-600/50 rounded-md p-3 border border-slate-500">
+                    <div class="flex items-center justify-between mb-1">
+                        <div class="flex items-center space-x-2">
+                            <span class="text-sm">${statusIcon}</span>
+                            <span class="text-xs font-medium text-slate-200">${job.description}</span>
+                            <span class="text-xs ${statusColor} capitalize">${job.status}</span>
+                        </div>
+                        ${job.status !== 'running' ? `
+                            <button onclick="removeMlJob('${job.job_id}')" class="text-xs text-slate-400 hover:text-slate-300 px-1">
+                                ✕
+                            </button>
+                        ` : ''}
+                    </div>
+                    
+                    ${job.status === 'running' ? `
+                        <div class="mb-1">
+                            <div class="text-xs text-slate-400 mb-1">${job.current_item || 'Processing...'}</div>
+                            <div class="w-full bg-slate-600 rounded-full h-1.5">
+                                <div class="bg-blue-500 h-1.5 rounded-full transition-all duration-300" style="width: ${progressPercent}%"></div>
+                            </div>
+                        </div>
+                    ` : ''}
+                    
+                    ${job.status === 'completed' && job.result ? `
+                        <div class="text-xs text-green-400 mt-1">
+                            ${job.result.message || 'Completed successfully'}
+                        </div>
+                    ` : ''}
+                    
+                    ${job.status === 'failed' && job.error ? `
+                        <div class="text-xs text-red-400 mt-1">
+                            Error: ${job.error}
+                        </div>
+                    ` : ''}
+                </div>
+            `;
+        }
+
+        function removeMlJob(jobId) {
+            fetch(`/jobs/${jobId}`, { method: 'DELETE' })
+                .then(() => {
+                    mlActiveJobs.delete(jobId);
+                    refreshMlJobs();
+                })
+                .catch(error => {
+                    console.error('Error removing ML job:', error);
+                });
+        }
+
+        function showToast(message, description, status = 'info') {
+            const container = document.getElementById('toast-container');
+            const toastId = `toast-${Date.now()}`;
+            const toast = document.createElement('div');
+            toast.id = toastId;
+            
+            const iconColor = status === 'success' ? 'text-green-400' : status === 'error' ? 'text-red-400' : 'text-blue-400';
+            const borderColor = status === 'success' ? 'border-green-500' : status === 'error' ? 'border-red-500' : 'border-blue-500';
+            const bgColor = status === 'success' ? 'bg-green-500/10' : status === 'error' ? 'bg-red-500/10' : 'bg-blue-500/10';
+            
+            let iconSvg = '';
+            if (status === 'success') {
+                iconSvg = `<svg class="h-5 w-5 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>`;
+            } else if (status === 'error') {
+                iconSvg = `<svg class="h-5 w-5 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m9-.75a9 9 0 11-18 0 9 9 0 0118 0zm-9 3.75h.008v.008H12v-.008z" /></svg>`;
+            } else {
+                iconSvg = `<svg class="h-5 w-5 ${iconColor}" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M11.25 11.25l.041-.02a.75.75 0 011.063.852l-.708 2.836a.75.75 0 001.063.853l.041-.021M21 12a9 9 0 11-18 0 9 9 0 0118 0zm-9-3.75h.008v.008H12V8.25z" /></svg>`;
+            }
+
+            // Escape HTML to prevent XSS
+            const escapeHtml = (text) => {
+                const div = document.createElement('div');
+                div.textContent = text;
+                return div.innerHTML;
+            };
+
+            // Improved responsive width and better layout
+            toast.className = `min-w-80 max-w-md w-full bg-slate-800 shadow-2xl rounded-lg pointer-events-auto ring-1 ring-black ring-opacity-5 overflow-hidden border ${borderColor} ${bgColor} backdrop-blur-sm transform transition-all duration-300 ease-in-out`;
+            toast.innerHTML = `
+                <div class="p-4">
+                    <div class="flex items-start space-x-3">
+                        <div class="flex-shrink-0 mt-0.5">${iconSvg}</div>
+                        <div class="flex-1 min-w-0">
+                            <p class="text-sm font-semibold text-slate-100 leading-5">${escapeHtml(description)}</p>
+                            <p class="mt-1 text-sm text-slate-300 leading-5 break-words">${escapeHtml(message)}</p>
+                        </div>
+                        <div class="flex-shrink-0">
+                            <button type="button" onclick="document.getElementById('${toastId}').remove()" class="inline-flex bg-transparent rounded-md p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-700/50 focus:outline-none focus:ring-2 focus:ring-slate-500 transition-colors duration-200" title="Close notification">
+                                <span class="sr-only">Close</span>
+                                <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                                </svg>
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            `;
+            
+            // Add entrance animation
+            toast.style.transform = 'translateX(100%)';
+            toast.style.opacity = '0';
+            container.appendChild(toast);
+            
+            // Trigger entrance animation
+            requestAnimationFrame(() => {
+                toast.style.transform = 'translateX(0)';
+                toast.style.opacity = '1';
+            });
+
+            // Auto-dismiss with longer duration for longer messages
+            const messageLength = message.length + description.length;
+            const baseDuration = 5000; // 5 seconds base
+            const extraDuration = Math.min(messageLength * 50, 5000); // Up to 5 extra seconds for long messages
+            const totalDuration = baseDuration + extraDuration;
+
+            setTimeout(() => {
+                const currentToast = document.getElementById(toastId);
+                if (currentToast) {
+                    currentToast.style.transform = 'translateX(100%)';
+                    currentToast.style.opacity = '0';
+                    setTimeout(() => {
+                        if (currentToast.parentNode) {
+                            currentToast.remove();
+                        }
+                    }, 300);
+                }
+            }, totalDuration);
+        }
+
+        function formatDuration(seconds) {
+            if (seconds === null || seconds === undefined || isNaN(seconds) || seconds < 0) return 'Unknown';
+            const hours = Math.floor(seconds / 3600);
+            const minutes = Math.floor((seconds % 3600) / 60);
+            const secs = Math.floor(seconds % 60);
+            
+            if (hours > 0) {
+                return `${hours}:${minutes.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+            } else {
+                return `${minutes}:${secs.toString().padStart(2, '0')}`;
+            }
+        }
+
+        // Search functionality
+        function filterVideos(searchTerm) {
+            const trimmedTerm = searchTerm.trim().toLowerCase();
+            const clearBtn = document.getElementById('search-clear-btn');
+            
+            // Show/hide clear button
+            if (trimmedTerm) {
+                clearBtn.classList.remove('hidden');
+            } else {
+                clearBtn.classList.add('hidden');
+            }
+            
+            // Filter videos
+            if (!trimmedTerm) {
+                filteredVideos = [...allVideos];
+            } else {
+                filteredVideos = allVideos.filter(video => {
+                    const searchText = `${video.display_title} ${video.filename}`.toLowerCase();
+                    return searchText.includes(trimmedTerm);
+                });
+            }
+            
+            // Render filtered results
+            renderVideoList(filteredVideos);
+            updateSearchSummary();
+            
+            // Clear selection if current selection is not in filtered results
+            const selectedVideoId = document.getElementById('selected-video-id').value;
+            if (selectedVideoId) {
+                const isSelectedInResults = filteredVideos.some(video => video.id == selectedVideoId);
+                if (!isSelectedInResults) {
+                    clearVideoSelection();
+                }
+            }
+        }
+
+        function clearVideoSearch() {
+            const searchInput = document.getElementById('video-search-input');
+            searchInput.value = '';
+            filterVideos('');
+            searchInput.focus();
+        }
+
+        function updateSearchSummary() {
+            const summary = document.getElementById('search-results-summary');
+            const resultsCount = document.getElementById('results-count');
+            const searchInput = document.getElementById('video-search-input');
+            
+            if (searchInput.value.trim()) {
+                resultsCount.textContent = filteredVideos.length;
+                summary.classList.remove('hidden');
+            } else {
+                summary.classList.add('hidden');
+            }
+        }
+
+        function clearVideoSelection() {
+            // Clear visual selection
+            document.querySelectorAll('.video-item').forEach(item => {
+                item.classList.remove('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
+            });
+            
+            // Clear form data
+            document.getElementById('selected-video-id').value = '';
+            document.getElementById('processing-form').style.display = 'none';
+            
+            // Reset status
+            document.getElementById('processing-status').innerHTML = `
+                <div class="text-center py-8 text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-12 h-12 mx-auto mb-3 opacity-50">
+                        <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd" />
+                    </svg>
+                    <p>Select a video to start processing</p>
+                </div>
+            `;
+            
+            // Hide analysis results
+            document.getElementById('analysis-results').style.display = 'none';
+        }
+
+        function clearProcessingStatus() {
+            // Clear the "Processing Started" message and return to default state
+            const selectedVideoId = document.getElementById('selected-video-id').value;
+            
+            if (selectedVideoId) {
+                // If a video is still selected, show the selected video info
+                const selectedItem = document.querySelector(`[data-video-id="${selectedVideoId}"]`);
+                if (selectedItem) {
+                    const videoTitle = selectedItem.querySelector('h3').textContent;
+                    const videoFilename = selectedItem.querySelector('p').textContent;
+                    
+                    document.getElementById('processing-status').innerHTML = `
+                        <div class="bg-slate-700 rounded-lg p-4">
+                            <h4 class="text-sm font-medium text-slate-200 mb-2">Selected Video</h4>
+                            <p class="text-slate-300">${videoTitle}</p>
+                            <p class="text-xs text-slate-400 mt-1">${videoFilename}</p>
+                        </div>
+                    `;
+                } else {
+                    // Fallback to default state
+                    resetToDefaultProcessingStatus();
+                }
+            } else {
+                // No video selected, show default state
+                resetToDefaultProcessingStatus();
+            }
+        }
+
+        function resetToDefaultProcessingStatus() {
+            document.getElementById('processing-status').innerHTML = `
+                <div class="text-center py-8 text-slate-400">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-12 h-12 mx-auto mb-3 opacity-50">
+                        <path fill-rule="evenodd" d="M12 2.25c-5.385 0-9.75 4.365-9.75 9.75s4.365 9.75 9.75 9.75 9.75-4.365 9.75-9.75S17.385 2.25 12 2.25zM12.75 6a.75.75 0 00-1.5 0v6c0 .414.336.75.75.75h4.5a.75.75 0 000-1.5h-3.75V6z" clip-rule="evenodd" />
+                    </svg>
+                    <p>Select a video to start processing</p>
+                </div>
+            `;
+        }
+
+        async function refreshVideoListAfterProcessing(processedVideoId) {
+            try {
+                // Remember the currently selected video
+                const selectedVideoId = document.getElementById('selected-video-id').value;
+                
+                // Reload the video list to get updated ML analysis status
+                await loadVideos();
+                
+                // If a video was selected, restore the selection and update the visual state
+                if (selectedVideoId) {
+                    const selectedItem = document.querySelector(`[data-video-id="${selectedVideoId}"]`);
+                    if (selectedItem) {
+                        // Restore visual selection
+                        selectedItem.classList.add('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
+                        
+                        // Update the processing status to show the selected video
+                        const videoTitle = selectedItem.querySelector('h3').textContent;
+                        const videoFilename = selectedItem.querySelector('p').textContent;
+                        
+                        document.getElementById('processing-status').innerHTML = `
+                            <div class="bg-slate-700 rounded-lg p-4">
+                                <h4 class="text-sm font-medium text-slate-200 mb-2">Selected Video</h4>
+                                <p class="text-slate-300">${videoTitle}</p>
+                                <p class="text-xs text-slate-400 mt-1">${videoFilename}</p>
+                            </div>
+                        `;
+                        
+                        // Keep the processing form visible
+                        document.getElementById('processing-form').style.display = 'block';
+                    }
+                }
+                
+                console.log(`Video list refreshed after processing video ID: ${processedVideoId}`);
+            } catch (error) {
+                console.error('Error refreshing video list after processing:', error);
+            }
+        }
+
+        function escapeHtml(text) {
+            const div = document.createElement('div');
+            div.textContent = text;
+            return div.innerHTML;
+        }
+
+        // Sorting functionality
+        function loadSortingPreferences() {
+            try {
+                const savedFilters = localStorage.getItem('pabt_search_filters');
+                if (savedFilters) {
+                    const filters = JSON.parse(savedFilters);
+                    currentSortBy = filters.sortBy || 'date_added';
+                    currentSortOrder = filters.sortOrder || 'desc';
+                    
+                    // Update UI to reflect loaded preferences
+                    document.getElementById('sort-by-select').value = currentSortBy;
+                    document.getElementById('sort-order-select').value = currentSortOrder;
+                }
+            } catch (error) {
+                console.error('Error loading sorting preferences:', error);
+                // Use defaults if loading fails
+                currentSortBy = 'date_added';
+                currentSortOrder = 'desc';
+            }
+        }
+
+        function updateVideoSorting() {
+            const sortBySelect = document.getElementById('sort-by-select');
+            const sortOrderSelect = document.getElementById('sort-order-select');
+            
+            currentSortBy = sortBySelect.value;
+            currentSortOrder = sortOrderSelect.value;
+            
+            // Save preferences to localStorage (same format as main page)
+            saveSortingPreferences();
+            
+            // Reload videos with new sorting
+            loadVideos();
+        }
+
+        function saveSortingPreferences() {
+            try {
+                // Load existing filters or create new object
+                let filters = {};
+                const savedFilters = localStorage.getItem('pabt_search_filters');
+                if (savedFilters) {
+                    filters = JSON.parse(savedFilters);
+                }
+                
+                // Update sorting preferences
+                filters.sortBy = currentSortBy;
+                filters.sortOrder = currentSortOrder;
+                
+                // Save back to localStorage
+                localStorage.setItem('pabt_search_filters', JSON.stringify(filters));
+            } catch (error) {
+                console.error('Error saving sorting preferences:', error);
+            }
+        }
+
+        // Cleanup on page unload
+        window.addEventListener('beforeunload', function() {
+            stopMlJobPolling();
+        });
+    </script>
+</body>
+</html> 

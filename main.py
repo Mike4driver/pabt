@@ -46,6 +46,7 @@ from routes import media_routes
 from routes import job_routes # Added job_routes
 from routes import processing_routes # Added processing_routes import
 from routes import settings_routes # Added settings_routes import
+from routes import ml_routes # Added ml_routes import
 
 app = FastAPI()
 
@@ -57,6 +58,7 @@ app.include_router(media_routes.router) # Include media routes
 app.include_router(job_routes.router, prefix="/jobs", tags=["jobs"]) # Added job_routes
 app.include_router(processing_routes.router, prefix="/processing", tags=["processing"]) # Added processing_routes
 app.include_router(settings_routes.router, prefix="/settings", tags=["settings"]) # Added settings_routes
+app.include_router(ml_routes.router, prefix="/ml", tags=["ml"]) # Added ml_routes
 
 
 # --- Jinja2 Filters & Globals ---

@@ -37,6 +37,18 @@ A web-based application for browsing, managing, and processing media files (vide
     *   Real-time job progress tracking with status updates.
     *   Job history and cleanup for completed/failed jobs.
 
+### Machine Learning Video Processing
+*   **Frame Extraction & Analysis:**
+    *   Extract frames from videos at configurable intervals (every 30th, 60th, 100th, etc. frame).
+    *   Generate embeddings for extracted frames using CLIP models (ViT-B/32, ViT-L/14, ViT-B/16).
+    *   Store frame embeddings and metadata in JSON format for future analysis.
+    *   Background processing with real-time progress tracking.
+    *   Support for multiple ML models via sentence-transformers library.
+*   **ML Dependencies:**
+    *   Uses sentence-transformers for generating image embeddings.
+    *   Supports CLIP models for vision-language understanding.
+    *   Requires PyTorch for model inference.
+
 ### Settings & Configuration
 *   **Database-Driven Settings:**
     *   Configure the `media_directory_name` (relative to the application's root).
@@ -120,13 +132,15 @@ pabt/
 ├── database.py            # Database operations and schema management
 ├── data_access.py         # Database queries and media file operations
 ├── media_processing.py    # FFmpeg operations and media processing
+├── ml_processing.py       # Machine learning frame analysis and embeddings
 ├── jobs_manager.py        # Background job system
 ├── utils.py               # Utility functions
 ├── routes/                # Modular route definitions
 │   ├── media_routes.py    # Media browsing and player routes
 │   ├── processing_routes.py # Media processing and transcoding routes
 │   ├── settings_routes.py # Application settings routes
-│   └── job_routes.py      # Background job status routes
+│   ├── job_routes.py      # Background job status routes
+│   └── ml_routes.py       # Machine learning processing routes
 ├── templates/             # HTML templates for the frontend
 ├── static/                # Static assets
 │   ├── icons/            # SVG icons
@@ -134,6 +148,7 @@ pabt/
 │   └── thumbnails/       # Generated thumbnails (auto-created)
 ├── media/                 # Default media directory (configurable)
 ├── media_transcoded/      # Transcoded video files (auto-created)
+├── ml_analysis/           # ML analysis results and frame embeddings (auto-created)
 ├── media_library.db       # SQLite database (auto-created)
 ├── requirements.txt       # Python dependencies
 └── README.md             # This file
