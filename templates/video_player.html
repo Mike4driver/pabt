@@ -480,6 +480,16 @@
                                         <path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z" clip-rule="evenodd" />
                                     </svg>
                                 </button>
+
+                                <!-- Keyboard Shortcuts Help Button -->
+                                <button id="keyboard-shortcuts-btn" 
+                                        onclick="openKeyboardShortcutsModal()"
+                                        class="text-white hover:text-primary transition-colors duration-150"
+                                        title="Keyboard shortcuts (?)">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                                        <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm11.378-3.917c-.89-.777-2.366-.777-3.255 0a.75.75 0 01-.988-1.129c1.454-1.272 3.776-1.272 5.23 0 1.513 1.324 1.513 3.518 0 4.842a3.75 3.75 0 01-.837.552c-.676.328-1.028.774-1.028 1.152v.75a.75.75 0 01-1.5 0v-.75c0-1.279.8-2.38 1.532-2.757.602-.293 1.163-.816 1.163-1.645 0-.59-.327-1.376-.317-2.015zM12 18a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
                                 
                                 <!-- Auto Replay Toggle -->
                                 <button id="auto-replay-toggle" 
@@ -861,6 +871,136 @@
                             Open Results in New Tab
                         </button>
                     </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Keyboard Shortcuts Modal -->
+    <div id="keyboardShortcutsModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 transition-opacity bg-slate-900 bg-opacity-75" onclick="closeKeyboardShortcutsModal()"></div>
+
+            <!-- Modal content -->
+            <div class="inline-block w-full max-w-2xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-slate-800 shadow-xl rounded-xl border border-slate-700">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-xl font-semibold text-slate-100 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6 mr-2 text-primary">
+                            <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12zm11.378-3.917c-.89-.777-2.366-.777-3.255 0a.75.75 0 01-.988-1.129c1.454-1.272 3.776-1.272 5.23 0 1.513 1.324 1.513 3.518 0 4.842a3.75 3.75 0 01-.837.552c-.676.328-1.028.774-1.028 1.152v.75a.75.75 0 01-1.5 0v-.75c0-1.279.8-2.38 1.532-2.757.602-.293 1.163-.816 1.163-1.645 0-.59-.327-1.376-.317-2.015zM12 18a.75.75 0 100-1.5.75.75 0 000 1.5z" clip-rule="evenodd" />
+                        </svg>
+                        Keyboard Shortcuts
+                    </h3>
+                    <button onclick="closeKeyboardShortcutsModal()" class="text-slate-400 hover:text-slate-200 transition-colors">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                            <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l5.47 5.47a.75.75 0 01-1.06 1.06L12 13.06l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-6 max-h-96 overflow-y-auto custom-scrollbar">
+                    <!-- Video Playback Controls -->
+                    <div class="space-y-3">
+                        <h4 class="text-lg font-medium text-slate-200 border-b border-slate-600 pb-2">Video Playback</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Play/Pause</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">Space</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Seek backward 10s</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">←</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Seek forward 10s</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">→</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Volume up</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">↑</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Volume down</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">↓</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Toggle mute</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">M</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Toggle fullscreen</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">F</kbd>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Navigation & Interface -->
+                    <div class="space-y-3">
+                        <h4 class="text-lg font-medium text-slate-200 border-b border-slate-600 pb-2">Navigation</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Previous video</span>
+                                <div class="flex space-x-1">
+                                    <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">Ctrl</kbd>
+                                    <span class="text-slate-400">+</span>
+                                    <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">←</kbd>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Next video</span>
+                                <div class="flex space-x-1">
+                                    <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">Ctrl</kbd>
+                                    <span class="text-slate-400">+</span>
+                                    <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">→</kbd>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Toggle queue sidebar</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">Q</kbd>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Center current video in queue</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">C</kbd>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Advanced Features -->
+                    <div class="space-y-3">
+                        <h4 class="text-lg font-medium text-slate-200 border-b border-slate-600 pb-2">Advanced Features</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Frame search modal</span>
+                                <div class="flex space-x-1">
+                                    <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">Ctrl</kbd>
+                                    <span class="text-slate-400">+</span>
+                                    <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">S</kbd>
+                                </div>
+                            </div>
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Show keyboard shortcuts</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">?</kbd>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- General -->
+                    <div class="space-y-3">
+                        <h4 class="text-lg font-medium text-slate-200 border-b border-slate-600 pb-2">General</h4>
+                        <div class="space-y-2">
+                            <div class="flex justify-between items-center">
+                                <span class="text-slate-300">Close modal/dialog</span>
+                                <kbd class="px-2 py-1 bg-slate-700 rounded text-xs font-mono text-slate-200">Esc</kbd>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="mt-6 flex justify-center">
+                    <button onclick="closeKeyboardShortcutsModal()" 
+                            class="bg-primary text-white font-semibold py-2.5 px-6 rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-primary/60 focus:ring-offset-2 focus:ring-offset-slate-800 transition-all duration-200">
+                        Got it!
+                    </button>
                 </div>
             </div>
         </div>
@@ -1547,6 +1687,18 @@
                         event.preventDefault();
                         closeFrameSearchModal();
                     }
+                    // Close keyboard shortcuts modal if open
+                    if (!document.getElementById('keyboardShortcutsModal').classList.contains('hidden')) {
+                        event.preventDefault();
+                        closeKeyboardShortcutsModal();
+                    }
+                    break;
+                case 'Slash':
+                    // Question mark key - show keyboard shortcuts (Shift + /)
+                    if (event.shiftKey) {
+                        event.preventDefault();
+                        openKeyboardShortcutsModal();
+                    }
                     break;
             }
         });
@@ -1708,6 +1860,7 @@
             if (event.key === 'Escape') {
                 closeAdvancedTranscodingModal();
                 closeFrameSearchModal();
+                closeKeyboardShortcutsModal();
             }
         });
 
@@ -2510,6 +2663,15 @@
             selectedFrame = null;
             document.getElementById('extracted-frames-grid').innerHTML = '';
             document.getElementById('frame-search-results-content').innerHTML = '';
+        }
+
+        // Keyboard Shortcuts Modal Functions
+        function openKeyboardShortcutsModal() {
+            document.getElementById('keyboardShortcutsModal').classList.remove('hidden');
+        }
+
+        function closeKeyboardShortcutsModal() {
+            document.getElementById('keyboardShortcutsModal').classList.add('hidden');
         }
 
         function extractCurrentFrame() {

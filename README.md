@@ -20,6 +20,7 @@ A web-based application for browsing, managing, and processing media files (vide
     *   Download original video files.
     *   Configurable autoplay, muting, auto-replay, and autoplay-next settings.
     *   Queue-based navigation with next/previous video functionality.
+    *   Full keyboard control with comprehensive keyboard shortcuts.
 *   **Processing Features:**
     *   On-demand thumbnail generation.
     *   Basic "Web-Optimized" transcoding for the current video.
@@ -214,6 +215,34 @@ pabt/
 *   All media processing operations run as background jobs.
 *   Real-time progress tracking and status updates.
 *   Job history and automatic cleanup of old completed jobs.
+
+## Keyboard Shortcuts (Video Player)
+
+The video player supports comprehensive keyboard navigation and control:
+
+### Video Playback
+*   **Space** - Play/pause video
+*   **← Arrow** - Seek backward 10 seconds
+*   **→ Arrow** - Seek forward 10 seconds  
+*   **↑ Arrow** - Increase volume
+*   **↓ Arrow** - Decrease volume
+*   **M** - Toggle mute
+*   **F** - Toggle fullscreen
+
+### Navigation
+*   **Ctrl + ← Arrow** - Previous video in queue
+*   **Ctrl + → Arrow** - Next video in queue
+*   **Q** - Toggle queue sidebar
+*   **C** - Center current video in queue
+
+### Advanced Features
+*   **Ctrl + S** - Open frame search modal (for semantic video search)
+*   **?** (Shift + /) - Show keyboard shortcuts modal
+
+### General
+*   **Esc** - Close any open modal or dialog
+
+*Note: Keyboard shortcuts are disabled when typing in input fields or text areas.*
 
 ## Notes
 
