@@ -26,127 +26,121 @@ def scan_media_directory_and_update_db():
         logger.error(f"Media directory {MEDIA_DIR} does not exist or is not a directory. Skipping scan.")
         return
 
-    conn = None # Manual connection management for this bulk operation
     try:
-        conn = db_connection(). __enter__() # Manually enter context for more control
-        cursor = conn.cursor()
+        with db_connection() as conn:
+            cursor = conn.cursor()
 
-        cursor.execute("SELECT id, filename, original_path FROM media_files")
-        db_files_tuples = cursor.fetchall()
-        db_files_map = {Path(row['original_path']).name: row['id'] for row in db_files_tuples}
-        
-        found_files_in_scan = set()
+            cursor.execute("SELECT id, filename, original_path FROM media_files")
+            db_files_tuples = cursor.fetchall()
+            db_files_map = {Path(row['original_path']).name: row['id'] for row in db_files_tuples}
+            
+            found_files_in_scan = set()
 
-        for file_path_obj in MEDIA_DIR.iterdir():
-            if file_path_obj.is_file():
-                filename = file_path_obj.name
-                original_path_str = str(file_path_obj.resolve())
-                found_files_in_scan.add(filename)
+            for file_path_obj in MEDIA_DIR.iterdir():
+                if file_path_obj.is_file():
+                    filename = file_path_obj.name
+                    original_path_str = str(file_path_obj.resolve())
+                    found_files_in_scan.add(filename)
 
-                media_type = None
-                suffix = file_path_obj.suffix.lower()
-                if suffix in SUPPORTED_VIDEO_EXTENSIONS: media_type = 'video'
-                elif suffix in SUPPORTED_AUDIO_EXTENSIONS: media_type = 'audio'
-                elif suffix in SUPPORTED_IMAGE_EXTENSIONS: media_type = 'image'
-                else:
-                    continue
+                    media_type = None
+                    suffix = file_path_obj.suffix.lower()
+                    if suffix in SUPPORTED_VIDEO_EXTENSIONS: media_type = 'video'
+                    elif suffix in SUPPORTED_AUDIO_EXTENSIONS: media_type = 'audio'
+                    elif suffix in SUPPORTED_IMAGE_EXTENSIONS: media_type = 'image'
+                    else:
+                        continue
 
-                logger.info(f"Processing file: {filename} (Type: {media_type})")
-                cursor.execute("SELECT id, last_scanned FROM media_files WHERE original_path = ?", (original_path_str,))
-                existing_file = cursor.fetchone()
+                    logger.info(f"Processing file: {filename} (Type: {media_type})")
+                    cursor.execute("SELECT id, last_scanned FROM media_files WHERE original_path = ?", (original_path_str,))
+                    existing_file = cursor.fetchone()
 
-                duration_str = get_media_duration(file_path_obj)
-                duration_seconds = None
-                if duration_str:
-                    parts = list(map(int, duration_str.split(':')))
-                    duration_seconds = timedelta(hours=parts[0], minutes=parts[1], seconds=parts[2]).total_seconds()
+                    duration_str = get_media_duration(file_path_obj)
+                    duration_seconds = None
+                    if duration_str:
+                        parts = list(map(int, duration_str.split(':')))
+                        duration_seconds = timedelta(hours=parts[0], minutes=parts[1], seconds=parts[2]).total_seconds()
 
-                width, height, fps = None, None, None
-                size_bytes = file_path_obj.stat().st_size
-                
-                if media_type == 'video':
-                    from moviepy.editor import VideoFileClip # Local import to avoid circular dependency if media_processing also imports from data_access
-                    try:
-                        with VideoFileClip(str(file_path_obj.resolve())) as clip:
-                            width, height = clip.size
-                            fps = clip.fps
-                    except Exception as e:
-                        logger.warning(f"Could not get video metadata for {filename}: {e}")
-                elif media_type == 'image':
-                    from PIL import Image # Local import
-                    try:
-                        with Image.open(file_path_obj.resolve()) as img:
-                            width, height = img.size
-                    except Exception as e:
-                        logger.warning(f"Could not get image metadata for {filename}: {e}")
-                
-                actual_thumbnail_p = get_thumbnail_path(file_path_obj)
-                has_specific_thumbnail = actual_thumbnail_p.exists()
-                db_thumbnail_path = str(actual_thumbnail_p.relative_to(BASE_DIR)) if has_specific_thumbnail else None
-                
-                transcoded_p = TRANSCODED_DIR / f"{slugify_for_id(file_path_obj.stem)}.mp4"
-                has_transcoded_version = transcoded_p.exists()
-                db_transcoded_path = str(transcoded_p.relative_to(BASE_DIR)) if has_transcoded_version else None
+                    width, height, fps = None, None, None
+                    size_bytes = file_path_obj.stat().st_size
+                    
+                    if media_type == 'video':
+                        from moviepy.editor import VideoFileClip # Local import to avoid circular dependency if media_processing also imports from data_access
+                        try:
+                            with VideoFileClip(str(file_path_obj.resolve())) as clip:
+                                width, height = clip.size
+                                fps = clip.fps
+                        except Exception as e:
+                            logger.warning(f"Could not get video metadata for {filename}: {e}")
+                    elif media_type == 'image':
+                        from PIL import Image # Local import
+                        try:
+                            with Image.open(file_path_obj.resolve()) as img:
+                                width, height = img.size
+                        except Exception as e:
+                            logger.warning(f"Could not get image metadata for {filename}: {e}")
+                    
+                    actual_thumbnail_p = get_thumbnail_path(file_path_obj)
+                    has_specific_thumbnail = actual_thumbnail_p.exists()
+                    db_thumbnail_path = str(actual_thumbnail_p.relative_to(BASE_DIR)) if has_specific_thumbnail else None
+                    
+                    transcoded_p = TRANSCODED_DIR / f"{slugify_for_id(file_path_obj.stem)}.mp4"
+                    has_transcoded_version = transcoded_p.exists()
+                    db_transcoded_path = str(transcoded_p.relative_to(BASE_DIR)) if has_transcoded_version else None
 
-                preview_p = get_preview_path(file_path_obj)
-                has_preview = preview_p.exists()
-                db_preview_path = str(preview_p.relative_to(BASE_DIR)) if has_preview else None
+                    preview_p = get_preview_path(file_path_obj)
+                    has_preview = preview_p.exists()
+                    db_preview_path = str(preview_p.relative_to(BASE_DIR)) if has_preview else None
 
-                metadata_dict = {"source": "filesystem_scan"}
-                if width and height: metadata_dict['resolution'] = f"{width}x{height}"
-                if fps: metadata_dict['fps'] = round(fps, 2)
-                metadata_json_str = json.dumps(metadata_dict)
+                    metadata_dict = {"source": "filesystem_scan"}
+                    if width and height: metadata_dict['resolution'] = f"{width}x{height}"
+                    if fps: metadata_dict['fps'] = round(fps, 2)
+                    metadata_json_str = json.dumps(metadata_dict)
 
-                if existing_file:
-                    logger.debug(f"Updating existing DB entry for: {filename} (scan data only)")
-                    cursor.execute("""
-                        UPDATE media_files 
-                        SET media_type=?, duration=?, width=?, height=?, fps=?, size_bytes=?, 
-                            last_scanned=CURRENT_TIMESTAMP, thumbnail_path=?, has_specific_thumbnail=?, 
-                            transcoded_path=?, has_transcoded_version=?, preview_path=?, has_preview=?,
-                            metadata_json=?
-                        WHERE id=?
-                    """, (media_type, duration_seconds, width, height, fps, size_bytes, 
-                          db_thumbnail_path, has_specific_thumbnail, 
-                          db_transcoded_path, has_transcoded_version, db_preview_path, has_preview,
-                          metadata_json_str, existing_file['id']))
-                else:
-                    logger.debug(f"Adding new DB entry for: {filename}")
-                    cursor.execute("""
-                        INSERT INTO media_files 
-                            (filename, original_path, media_type, user_title, duration, width, height, fps, size_bytes, 
-                             last_scanned, thumbnail_path, has_specific_thumbnail, 
-                             transcoded_path, has_transcoded_version, preview_path, has_preview, 
-                             tags, metadata_json)
-                        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?)
-                    """, (filename, original_path_str, media_type, None,
-                          duration_seconds, width, height, fps, size_bytes,
-                          db_thumbnail_path, has_specific_thumbnail, 
-                          db_transcoded_path, has_transcoded_version, db_preview_path, has_preview, 
-                          '[]', metadata_json_str))
-                conn.commit() # Commit after each file processing
+                    if existing_file:
+                        logger.debug(f"Updating existing DB entry for: {filename} (scan data only)")
+                        cursor.execute("""
+                            UPDATE media_files 
+                            SET media_type=?, duration=?, width=?, height=?, fps=?, size_bytes=?, 
+                                last_scanned=CURRENT_TIMESTAMP, thumbnail_path=?, has_specific_thumbnail=?, 
+                                transcoded_path=?, has_transcoded_version=?, preview_path=?, has_preview=?,
+                                metadata_json=?
+                            WHERE id=?
+                        """, (media_type, duration_seconds, width, height, fps, size_bytes, 
+                              db_thumbnail_path, has_specific_thumbnail, 
+                              db_transcoded_path, has_transcoded_version, db_preview_path, has_preview,
+                              metadata_json_str, existing_file['id']))
+                    else:
+                        logger.debug(f"Adding new DB entry for: {filename}")
+                        cursor.execute("""
+                            INSERT INTO media_files 
+                                (filename, original_path, media_type, user_title, duration, width, height, fps, size_bytes, 
+                                 last_scanned, thumbnail_path, has_specific_thumbnail, 
+                                 transcoded_path, has_transcoded_version, preview_path, has_preview, 
+                                 tags, metadata_json)
+                            VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CURRENT_TIMESTAMP, ?, ?, ?, ?, ?, ?, ?, ?)
+                        """, (filename, original_path_str, media_type, None,
+                              duration_seconds, width, height, fps, size_bytes,
+                              db_thumbnail_path, has_specific_thumbnail, 
+                              db_transcoded_path, has_transcoded_version, db_preview_path, has_preview, 
+                              '[]', metadata_json_str))
+                    conn.commit() # Commit after each file processing
 
-        db_filenames_set = set(db_files_map.keys())
-        orphaned_filenames = db_filenames_set - found_files_in_scan
-        if orphaned_filenames:
-            logger.info(f"Found orphaned files in DB (will be removed): {orphaned_filenames}")
-            for orphaned_file_name in orphaned_filenames:
-                file_id_to_delete = db_files_map[orphaned_file_name]
-                cursor.execute("DELETE FROM media_files WHERE id = ?", (file_id_to_delete,))
-                logger.info(f"Removed orphaned DB entry for: {orphaned_file_name} (ID: {file_id_to_delete})")
-            conn.commit()
-        logger.info("Media scan and database update completed.")
+            db_filenames_set = set(db_files_map.keys())
+            orphaned_filenames = db_filenames_set - found_files_in_scan
+            if orphaned_filenames:
+                logger.info(f"Found orphaned files in DB (will be removed): {orphaned_filenames}")
+                for orphaned_file_name in orphaned_filenames:
+                    file_id_to_delete = db_files_map[orphaned_file_name]
+                    cursor.execute("DELETE FROM media_files WHERE id = ?", (file_id_to_delete,))
+                    logger.info(f"Removed orphaned DB entry for: {orphaned_file_name} (ID: {file_id_to_delete})")
+                conn.commit()
+            logger.info("Media scan and database update completed.")
     except sqlite3.Error as e:
         logger.error(f"SQLite error during media scan: {e}")
-        if conn: conn.rollback()
-        # raise # Optionally re-raise or handle more gracefully
+        raise  # Re-raise to let the background job handle the failure
     except Exception as e:
         logger.error(f"Unexpected error during media scan: {e}")
-        if conn: conn.rollback()
-        # raise
-    finally:
-        if conn:
-            db_connection().__exit__(None, None, None) # Manually exit context
+        raise  # Re-raise to let the background job handle the failure
 
 # --- Data Formatting and Fetching Logic ---
 def format_media_duration(seconds: float | None) -> str | None:

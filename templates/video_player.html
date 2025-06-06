@@ -471,6 +471,16 @@
                                     </div>
                                 </div>
                                 
+                                <!-- Frame Search Button -->
+                                <button id="frame-search-btn" 
+                                        onclick="openFrameSearchModal()"
+                                        class="text-white hover:text-primary transition-colors duration-150"
+                                        title="Search by frame">
+                                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                                        <path fill-rule="evenodd" d="M10.5 3.75a6.75 6.75 0 1 0 0 13.5 6.75 6.75 0 0 0 0-13.5ZM2.25 10.5a8.25 8.25 0 1 1 14.59 5.28l4.69 4.69a.75.75 0 1 1-1.06 1.06l-4.69-4.69A8.25 8.25 0 0 1 2.25 10.5Z" clip-rule="evenodd" />
+                                    </svg>
+                                </button>
+                                
                                 <!-- Auto Replay Toggle -->
                                 <button id="auto-replay-toggle" 
                                         onclick="toggleAutoReplay()"
@@ -705,6 +715,157 @@
         </div>
     </div>
 
+    <!-- Frame Search Modal -->
+    <div id="frameSearchModal" class="fixed inset-0 z-50 hidden overflow-y-auto">
+        <div class="flex items-center justify-center min-h-screen px-4 pt-4 pb-20 text-center sm:block sm:p-0">
+            <!-- Background overlay -->
+            <div class="fixed inset-0 transition-opacity bg-slate-900 bg-opacity-75" onclick="closeFrameSearchModal()"></div>
+
+            <!-- Modal content -->
+            <div class="inline-block w-full max-w-4xl p-6 my-8 overflow-hidden text-left align-middle transition-all transform bg-slate-800 shadow-xl rounded-xl border border-slate-700">
+                <div class="flex justify-between items-center mb-6">
+                    <h3 class="text-lg font-semibold text-slate-100">Search by Frame</h3>
+                    <button onclick="closeFrameSearchModal()" class="text-slate-400 hover:text-slate-200">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-6 h-6">
+                            <path fill-rule="evenodd" d="M5.47 5.47a.75.75 0 011.06 0L12 10.94l5.47-5.47a.75.75 0 111.06 1.06L13.06 12l-5.47 5.47a.75.75 0 01-1.06-1.06L10.94 12 5.47 6.53a.75.75 0 010-1.06z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+
+                <!-- Step 1: Extract Frames -->
+                <div id="frame-extraction-step" class="mb-6">
+                    <h4 class="text-md font-medium text-slate-200 mb-4">Step 1: Extract Frames from Current Video</h4>
+                    <div class="flex items-center space-x-4 mb-4">
+                        <button onclick="extractCurrentFrame()" 
+                                class="bg-primary text-white font-semibold py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors duration-200">
+                            📸 Current Frame
+                        </button>
+                        <button onclick="extractMultipleFrames()" 
+                                class="bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-500 transition-colors duration-200">
+                            🎬 Multiple Frames
+                        </button>
+                        <div class="text-sm text-slate-400">
+                            Extract frames to use for semantic search
+                        </div>
+                    </div>
+                    
+                    <!-- Multiple frames options -->
+                    <div id="multiple-frames-options" class="hidden bg-slate-700/50 rounded-lg p-4 mb-4">
+                        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Frame Count</label>
+                                <select id="frame-count-select" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200">
+                                    <option value="5">5 frames</option>
+                                    <option value="8" selected>8 frames</option>
+                                    <option value="10">10 frames</option>
+                                    <option value="12">12 frames</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-slate-300 mb-2">Distribution</label>
+                                <select id="frame-distribution-select" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200">
+                                    <option value="even" selected>Even distribution</option>
+                                    <option value="around-current">Around current time</option>
+                                    <option value="custom">Custom timestamps</option>
+                                </select>
+                            </div>
+                            <div>
+                                <button onclick="generateFrameTimestamps()" 
+                                        class="mt-6 w-full bg-blue-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-blue-500 transition-colors duration-200">
+                                    Generate Frames
+                                </button>
+                            </div>
+                        </div>
+                        
+                        <!-- Custom timestamps input -->
+                        <div id="custom-timestamps-input" class="hidden mt-4">
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Custom Timestamps (seconds, comma-separated)</label>
+                            <input type="text" id="custom-timestamps" placeholder="10, 30, 60, 120, 180" 
+                                   class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200">
+                        </div>
+                    </div>
+                    
+                    <!-- Loading indicator -->
+                    <div id="frame-extraction-loading" class="hidden text-center py-4">
+                        <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-primary mx-auto mb-2"></div>
+                        <div class="text-slate-400">Extracting frames...</div>
+                    </div>
+                </div>
+
+                <!-- Step 2: Select Frame -->
+                <div id="frame-selection-step" class="mb-6 hidden">
+                    <h4 class="text-md font-medium text-slate-200 mb-4">Step 2: Select Frame for Search</h4>
+                    <div id="extracted-frames-grid" class="grid grid-cols-2 md:grid-cols-4 gap-4 mb-4">
+                        <!-- Frames will be populated here -->
+                    </div>
+                    <div class="text-sm text-slate-400 mb-4">
+                        Click on a frame to select it for semantic search
+                    </div>
+                </div>
+
+                <!-- Step 3: Search Options -->
+                <div id="search-options-step" class="mb-6 hidden">
+                    <h4 class="text-md font-medium text-slate-200 mb-4">Step 3: Search Options</h4>
+                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Similarity Threshold</label>
+                            <select id="frame-search-threshold" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200">
+                                <option value="0.25">Broad (25%)</option>
+                                <option value="0.35" selected>Balanced (35%)</option>
+                                <option value="0.45">Precise (45%)</option>
+                                <option value="0.55">Very Precise (55%)</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-slate-300 mb-2">Max Results</label>
+                            <select id="frame-search-max-results" class="w-full px-3 py-2 bg-slate-700 border border-slate-600 rounded-md text-slate-200">
+                                <option value="10">10 videos</option>
+                                <option value="20" selected>20 videos</option>
+                                <option value="30">30 videos</option>
+                                <option value="50">50 videos</option>
+                            </select>
+                        </div>
+                    </div>
+                    
+                    <!-- Selected frame preview -->
+                    <div id="selected-frame-preview" class="bg-slate-700/50 rounded-lg p-4 mb-4 hidden">
+                        <div class="flex items-center space-x-4">
+                            <img id="selected-frame-image" src="" alt="Selected frame" class="w-24 h-16 object-cover rounded border border-slate-600">
+                            <div>
+                                <div class="text-sm font-medium text-slate-200">Selected Frame</div>
+                                <div id="selected-frame-timestamp" class="text-xs text-slate-400"></div>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <button onclick="performFrameSearch()" 
+                            class="w-full bg-green-600 text-white font-semibold py-3 px-4 rounded-lg hover:bg-green-500 transition-colors duration-200 flex items-center justify-center">
+                        <span id="frame-search-loading" class="hidden animate-spin h-4 w-4 border-2 border-white border-t-transparent rounded-full mr-2"></span>
+                        🔍 Search Similar Videos
+                    </button>
+                </div>
+
+                <!-- Search Results -->
+                <div id="frame-search-results" class="hidden">
+                    <h4 class="text-md font-medium text-slate-200 mb-4">Search Results</h4>
+                    <div id="frame-search-results-content" class="space-y-3 max-h-96 overflow-y-auto custom-scrollbar">
+                        <!-- Results will be populated here -->
+                    </div>
+                    <div class="mt-4 flex space-x-3">
+                        <button onclick="closeFrameSearchModal()" 
+                                class="flex-1 bg-slate-600 text-white font-semibold py-2 px-4 rounded-lg hover:bg-slate-500 transition-colors duration-200">
+                            Close
+                        </button>
+                        <button onclick="openSearchResultsInNewTab()" 
+                                class="flex-1 bg-primary text-white font-semibold py-2 px-4 rounded-lg hover:bg-primary/90 transition-colors duration-200">
+                            Open Results in New Tab
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <style>
         /* Custom Scrollbar for Webkit browsers */
         .custom-scrollbar::-webkit-scrollbar {
@@ -834,6 +995,44 @@
                 min-height: 200px;
             }
         }
+
+        /* Frame Search Modal Styles */
+        .frame-hover-effect {
+            transition: all 0.2s ease-in-out;
+        }
+        
+        .frame-hover-effect:hover {
+            transform: scale(1.02);
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+        }
+        
+        .frame-selected {
+            transform: scale(1.02);
+            box-shadow: 0 0 0 2px #1a73e8, 0 4px 12px rgba(26, 115, 232, 0.3);
+        }
+        
+        /* Smooth transitions for modal steps */
+        #frame-extraction-step,
+        #frame-selection-step,
+        #search-options-step,
+        #frame-search-results {
+            transition: opacity 0.3s ease-in-out;
+        }
+        
+        /* Custom scrollbar for frame search results */
+        #frame-search-results-content::-webkit-scrollbar {
+            width: 6px;
+        }
+        #frame-search-results-content::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        #frame-search-results-content::-webkit-scrollbar-thumb {
+            background: #475569;
+            border-radius: 3px;
+        }
+        #frame-search-results-content::-webkit-scrollbar-thumb:hover {
+            background: #64748b;
+        }
     </style>
     <script>
         let choicesTagsInstance = null;
@@ -903,6 +1102,9 @@
                 }
             });
 
+            // Handle start time from semantic search
+            handleStartTime();
+
             // Handle autoplay
             handleAutoplay();
 
@@ -912,6 +1114,65 @@
 
             // Hide center play button initially if autoplay
             updateCenterPlayButton();
+        }
+
+        function handleStartTime() {
+            // Check if we have a start time from semantic search
+            {% if start_time %}
+            const startTime = {{ start_time }};
+            console.log('🎯 Semantic search start time detected:', startTime, 'seconds');
+            
+            // Set the start time when metadata is loaded
+            if (video.readyState >= 1) {
+                // Metadata already loaded, set time immediately
+                video.currentTime = startTime;
+                console.log('✅ Set video start time to', startTime, 'seconds');
+            } else {
+                // Wait for metadata to load
+                video.addEventListener('loadedmetadata', function setStartTime() {
+                    video.currentTime = startTime;
+                    console.log('✅ Set video start time to', startTime, 'seconds (after metadata loaded)');
+                    video.removeEventListener('loadedmetadata', setStartTime);
+                });
+            }
+            
+            // Show a notification about the semantic search jump
+            showSemanticSearchNotification(startTime);
+            {% endif %}
+        }
+
+        function showSemanticSearchNotification(timestamp) {
+            // Create and show a notification that we jumped to a semantic search result
+            const notification = document.createElement('div');
+            notification.id = 'semantic-search-notification';
+            notification.className = 'absolute top-4 left-1/2 transform -translate-x-1/2 bg-purple-600/90 text-white px-4 py-2 rounded-lg shadow-lg z-10 flex items-center space-x-2';
+            notification.innerHTML = `
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5">
+                    <path d="M8 2a6 6 0 100 12A6 6 0 008 2zM7 5a1 1 0 112 0v2a1 1 0 11-2 0V5zM8 10a1 1 0 100-2 1 1 0 000 2z"/>
+                </svg>
+                <span class="text-sm font-medium">Jumped to best matching frame at ${formatTime(timestamp)}</span>
+                <button onclick="hideSemanticSearchNotification()" class="text-purple-200 hover:text-white ml-2">
+                    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                        <path d="M6.28 5.22a.75.75 0 00-1.06 1.06L8.94 10l-3.72 3.72a.75.75 0 101.06 1.06L10 11.06l3.72 3.72a.75.75 0 101.06-1.06L11.06 10l3.72-3.72a.75.75 0 00-1.06-1.06L10 8.94 6.28 5.22z" />
+                    </svg>
+                </button>
+            `;
+            
+            // Add to video container
+            const videoContainer = document.getElementById('video-player-container');
+            videoContainer.appendChild(notification);
+            
+            // Auto-hide after 5 seconds
+            setTimeout(() => {
+                hideSemanticSearchNotification();
+            }, 5000);
+        }
+
+        function hideSemanticSearchNotification() {
+            const notification = document.getElementById('semantic-search-notification');
+            if (notification) {
+                notification.remove();
+            }
         }
 
         function handleAutoplay() {
@@ -1273,6 +1534,20 @@
                     event.preventDefault();
                     toggleFullscreen();
                     break;
+                case 'KeyS':
+                    // S key - open frame search modal
+                    if (event.ctrlKey || event.metaKey) {
+                        event.preventDefault();
+                        openFrameSearchModal();
+                    }
+                    break;
+                case 'Escape':
+                    // Close frame search modal if open
+                    if (!document.getElementById('frameSearchModal').classList.contains('hidden')) {
+                        event.preventDefault();
+                        closeFrameSearchModal();
+                    }
+                    break;
             }
         });
 
@@ -1428,10 +1703,11 @@
             }
         }
 
-        // Close modal when pressing Escape key
+        // Close modals when pressing Escape key
         document.addEventListener('keydown', function(event) {
             if (event.key === 'Escape') {
                 closeAdvancedTranscodingModal();
+                closeFrameSearchModal();
             }
         });
 
@@ -2201,6 +2477,303 @@
                 chevron.style.transform = 'rotate(0deg)';
             }
         }
+
+        // Frame Search Modal Functions
+        let extractedFrames = [];
+        let selectedFrame = null;
+
+        function openFrameSearchModal() {
+            document.getElementById('frameSearchModal').classList.remove('hidden');
+            resetFrameSearchModal();
+        }
+
+        function closeFrameSearchModal() {
+            document.getElementById('frameSearchModal').classList.add('hidden');
+            resetFrameSearchModal();
+        }
+
+        function resetFrameSearchModal() {
+            // Reset all steps
+            document.getElementById('frame-extraction-step').classList.remove('hidden');
+            document.getElementById('frame-selection-step').classList.add('hidden');
+            document.getElementById('search-options-step').classList.add('hidden');
+            document.getElementById('frame-search-results').classList.add('hidden');
+            
+            // Reset options
+            document.getElementById('multiple-frames-options').classList.add('hidden');
+            document.getElementById('custom-timestamps-input').classList.add('hidden');
+            document.getElementById('frame-extraction-loading').classList.add('hidden');
+            document.getElementById('selected-frame-preview').classList.add('hidden');
+            
+            // Clear data
+            extractedFrames = [];
+            selectedFrame = null;
+            document.getElementById('extracted-frames-grid').innerHTML = '';
+            document.getElementById('frame-search-results-content').innerHTML = '';
+        }
+
+        function extractCurrentFrame() {
+            if (!video) {
+                alert('Video not ready');
+                return;
+            }
+            
+            const currentTime = video.currentTime;
+            extractFramesAtTimestamps([currentTime]);
+        }
+
+        function extractMultipleFrames() {
+            document.getElementById('multiple-frames-options').classList.toggle('hidden');
+        }
+
+        function generateFrameTimestamps() {
+            if (!video || !video.duration) {
+                alert('Video not ready');
+                return;
+            }
+            
+            const frameCount = parseInt(document.getElementById('frame-count-select').value);
+            const distribution = document.getElementById('frame-distribution-select').value;
+            const duration = video.duration;
+            const currentTime = video.currentTime;
+            
+            let timestamps = [];
+            
+            if (distribution === 'even') {
+                // Distribute frames evenly across the video
+                for (let i = 0; i < frameCount; i++) {
+                    const timestamp = (duration / (frameCount + 1)) * (i + 1);
+                    timestamps.push(timestamp);
+                }
+            } else if (distribution === 'around-current') {
+                // Distribute frames around current time
+                const timeWindow = Math.min(60, duration / 2); // 60 seconds or half video duration
+                const startTime = Math.max(0, currentTime - timeWindow / 2);
+                const endTime = Math.min(duration, currentTime + timeWindow / 2);
+                
+                for (let i = 0; i < frameCount; i++) {
+                    const timestamp = startTime + ((endTime - startTime) / (frameCount - 1)) * i;
+                    timestamps.push(timestamp);
+                }
+            } else if (distribution === 'custom') {
+                const customInput = document.getElementById('custom-timestamps').value;
+                if (!customInput.trim()) {
+                    alert('Please enter custom timestamps');
+                    return;
+                }
+                
+                try {
+                    timestamps = customInput.split(',').map(t => parseFloat(t.trim())).filter(t => !isNaN(t) && t >= 0 && t <= duration);
+                    if (timestamps.length === 0) {
+                        alert('No valid timestamps found');
+                        return;
+                    }
+                } catch (e) {
+                    alert('Invalid timestamp format');
+                    return;
+                }
+            }
+            
+            extractFramesAtTimestamps(timestamps);
+        }
+
+        function extractFramesAtTimestamps(timestamps) {
+            document.getElementById('frame-extraction-loading').classList.remove('hidden');
+            
+            const videoName = '{{ video.name }}';
+            const timestampsStr = timestamps.join(',');
+            
+            const formData = new FormData();
+            formData.append('timestamps', timestampsStr);
+            formData.append('max_frames', '12');
+            
+            fetch(`/api/extract-frames/${encodeURIComponent(videoName)}`, {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('frame-extraction-loading').classList.add('hidden');
+                
+                if (data.extracted_frames && data.extracted_frames.length > 0) {
+                    extractedFrames = data.extracted_frames;
+                    displayExtractedFrames();
+                    showFrameSelectionStep();
+                } else {
+                    alert('No frames could be extracted. Please try different timestamps.');
+                }
+            })
+            .catch(error => {
+                document.getElementById('frame-extraction-loading').classList.add('hidden');
+                console.error('Error extracting frames:', error);
+                alert('Error extracting frames. Please try again.');
+            });
+        }
+
+        function displayExtractedFrames() {
+            const grid = document.getElementById('extracted-frames-grid');
+            grid.innerHTML = '';
+            
+            extractedFrames.forEach((frame, index) => {
+                const frameElement = document.createElement('div');
+                frameElement.className = 'relative cursor-pointer group frame-hover-effect';
+                frameElement.onclick = () => selectFrame(index);
+                
+                frameElement.innerHTML = `
+                    <img src="${frame.frame_data}" alt="Frame at ${frame.timestamp.toFixed(1)}s" 
+                         class="w-full aspect-video object-cover rounded border-2 border-transparent group-hover:border-primary transition-colors duration-200">
+                    <div class="absolute bottom-0 left-0 right-0 bg-black/70 text-white text-xs p-1 rounded-b">
+                        ${formatTime(frame.timestamp)}
+                    </div>
+                    <div id="frame-selected-${index}" class="absolute inset-0 bg-primary/20 border-2 border-primary rounded hidden">
+                        <div class="absolute top-1 right-1 bg-primary text-white rounded-full w-6 h-6 flex items-center justify-center text-xs">
+                            ✓
+                        </div>
+                    </div>
+                `;
+                
+                grid.appendChild(frameElement);
+            });
+        }
+
+        function selectFrame(index) {
+            // Clear previous selection
+            extractedFrames.forEach((_, i) => {
+                document.getElementById(`frame-selected-${i}`).classList.add('hidden');
+            });
+            
+            // Select new frame
+            document.getElementById(`frame-selected-${index}`).classList.remove('hidden');
+            selectedFrame = extractedFrames[index];
+            
+            // Update preview
+            document.getElementById('selected-frame-image').src = selectedFrame.frame_data;
+            document.getElementById('selected-frame-timestamp').textContent = `Timestamp: ${formatTime(selectedFrame.timestamp)}`;
+            document.getElementById('selected-frame-preview').classList.remove('hidden');
+            
+            showSearchOptionsStep();
+        }
+
+        function showFrameSelectionStep() {
+            document.getElementById('frame-extraction-step').classList.add('hidden');
+            document.getElementById('frame-selection-step').classList.remove('hidden');
+        }
+
+        function showSearchOptionsStep() {
+            document.getElementById('frame-selection-step').classList.add('hidden');
+            document.getElementById('search-options-step').classList.remove('hidden');
+        }
+
+        function performFrameSearch() {
+            if (!selectedFrame) {
+                alert('Please select a frame first');
+                return;
+            }
+            
+            document.getElementById('frame-search-loading').classList.remove('hidden');
+            
+            const threshold = parseFloat(document.getElementById('frame-search-threshold').value);
+            const maxResults = parseInt(document.getElementById('frame-search-max-results').value);
+            
+            const formData = new FormData();
+            formData.append('frame_data', selectedFrame.frame_data);
+            formData.append('similarity_threshold', threshold.toString());
+            formData.append('max_results', maxResults.toString());
+            
+            fetch('/api/semantic-search-by-frame', {
+                method: 'POST',
+                body: formData
+            })
+            .then(response => response.json())
+            .then(data => {
+                document.getElementById('frame-search-loading').classList.add('hidden');
+                displayFrameSearchResults(data);
+                showSearchResults();
+            })
+            .catch(error => {
+                document.getElementById('frame-search-loading').classList.add('hidden');
+                console.error('Error performing frame search:', error);
+                alert('Error performing search. Please try again.');
+            });
+        }
+
+        function displayFrameSearchResults(data) {
+            const container = document.getElementById('frame-search-results-content');
+            container.innerHTML = '';
+            
+            if (!data.search_results || data.search_results.length === 0) {
+                container.innerHTML = `
+                    <div class="text-center py-8 text-slate-400">
+                        <div class="text-lg mb-2">No similar videos found</div>
+                        <div class="text-sm">Try adjusting the similarity threshold or selecting a different frame</div>
+                    </div>
+                `;
+                return;
+            }
+            
+            data.search_results.forEach(video => {
+                const resultElement = document.createElement('div');
+                resultElement.className = 'flex items-center space-x-4 p-3 bg-slate-700/50 rounded-lg hover:bg-slate-700 transition-colors duration-200 cursor-pointer';
+                
+                // Build URL with timestamp if available
+                let videoUrl = `/video/${encodeURIComponent(video.name)}`;
+                if (video.best_frame_timestamp !== undefined) {
+                    videoUrl += `?t=${video.best_frame_timestamp}`;
+                }
+                
+                resultElement.onclick = () => window.open(videoUrl, '_blank');
+                
+                resultElement.innerHTML = `
+                    <img src="${video.thumbnail || '/static/icons/generic-video-icon.svg'}" alt="${video.display_title}" 
+                         class="w-20 h-12 object-cover rounded border border-slate-600">
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-slate-200 truncate">${video.display_title}</div>
+                        <div class="text-xs text-slate-400 mt-1">
+                            Similarity: ${(video.max_similarity * 100).toFixed(1)}% • 
+                            ${video.matching_frames} matching frames • 
+                            ${video.duration || 'Unknown duration'}
+                            ${video.best_frame_timestamp !== undefined ? ` • Best match at ${formatTime(video.best_frame_timestamp)}` : ''}
+                        </div>
+                    </div>
+                    <div class="text-xs text-slate-400">
+                        Score: ${(video.semantic_search_score * 100).toFixed(1)}%
+                    </div>
+                `;
+                
+                container.appendChild(resultElement);
+            });
+            
+            // Add summary
+            const summary = document.createElement('div');
+            summary.className = 'text-xs text-slate-400 text-center py-2 border-t border-slate-600 mt-4';
+            summary.textContent = `Found ${data.total_results} videos with ${data.frames_above_threshold} matching frames (threshold: ${(data.similarity_threshold * 100).toFixed(0)}%)`;
+            container.appendChild(summary);
+        }
+
+        function showSearchResults() {
+            document.getElementById('search-options-step').classList.add('hidden');
+            document.getElementById('frame-search-results').classList.remove('hidden');
+        }
+
+        function openSearchResultsInNewTab() {
+            // This could be enhanced to create a dedicated search results page
+            alert('Feature coming soon: Open results in dedicated search page');
+        }
+
+        // Show/hide custom timestamps input based on distribution selection
+        document.addEventListener('DOMContentLoaded', function() {
+            const distributionSelect = document.getElementById('frame-distribution-select');
+            if (distributionSelect) {
+                distributionSelect.addEventListener('change', function() {
+                    const customInput = document.getElementById('custom-timestamps-input');
+                    if (this.value === 'custom') {
+                        customInput.classList.remove('hidden');
+                    } else {
+                        customInput.classList.add('hidden');
+                    }
+                });
+            }
+        });
 
         // Initialize collapsible sections on page load
         document.addEventListener('DOMContentLoaded', function() {

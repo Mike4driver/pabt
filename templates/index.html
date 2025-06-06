@@ -30,6 +30,42 @@
             }
         }
     </script>
+    <style>
+        /* Custom slider styling */
+        .slider::-webkit-slider-thumb {
+            appearance: none;
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #a855f7;
+            cursor: pointer;
+            border: 2px solid #1e293b;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .slider::-moz-range-thumb {
+            height: 16px;
+            width: 16px;
+            border-radius: 50%;
+            background: #a855f7;
+            cursor: pointer;
+            border: 2px solid #1e293b;
+            box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+        }
+        
+        .slider::-webkit-slider-track {
+            background: linear-gradient(to right, #ef4444 0%, #f59e0b 25%, #10b981 50%, #3b82f6 75%, #8b5cf6 100%);
+            height: 4px;
+            border-radius: 2px;
+        }
+        
+        .slider::-moz-range-track {
+            background: linear-gradient(to right, #ef4444 0%, #f59e0b 25%, #10b981 50%, #3b82f6 75%, #8b5cf6 100%);
+            height: 4px;
+            border-radius: 2px;
+            border: none;
+        }
+    </style>
 </head>
 <body class="bg-slate-900 text-slate-200 min-h-screen font-sans">
     <header class="bg-slate-800 sticky top-0 z-50 border-b border-slate-700 shadow-lg">
@@ -58,15 +94,105 @@
                                id="search-input" 
                                name="search" 
                                placeholder="Search media files..." 
-                               class="block w-full pl-10 pr-20 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 text-sm backdrop-blur-sm"
+                               class="block w-full pl-10 pr-24 py-2.5 bg-slate-700/50 border border-slate-600 rounded-lg text-slate-200 placeholder-slate-400 focus:outline-none focus:ring-2 focus:ring-primary/50 focus:border-primary transition-all duration-200 text-sm backdrop-blur-sm"
                                hx-get="/files"
                                hx-trigger="keyup changed delay:500ms, search"
                                hx-target="#media-grid"
                                hx-include="#advanced-search-form"
-                               hx-indicator="#search-indicator">
+                               hx-indicator="#search-indicator"
+                               oninput="updateSearchPlaceholder()">
                         
                         <!-- Search Controls -->
                         <div class="absolute inset-y-0 right-0 flex items-center pr-2">
+                            <!-- AI Search Controls -->
+                            <div id="ai-search-controls" class="mr-2 flex items-center space-x-1">
+                                <!-- AI Search Toggle -->
+                                <button type="button" 
+                                        id="ai-search-toggle"
+                                        class="px-2 py-1 rounded-md transition-all duration-200 border"
+                                        title="Toggle AI semantic search"
+                                        onclick="toggleAISearch()">
+                                    <div class="flex items-center space-x-1">
+                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3">
+                                            <path d="M8 2a6 6 0 100 12A6 6 0 008 2zM7 5a1 1 0 112 0v2a1 1 0 11-2 0V5zM8 10a1 1 0 100-2 1 1 0 000 2z"/>
+                                        </svg>
+                                        <span class="text-xs font-medium">AI</span>
+                                    </div>
+                                </button>
+                                
+                                <!-- Threshold Control (hidden by default) -->
+                                <div id="threshold-control" class="hidden">
+                                    <div class="relative" x-data="{ open: false }">
+                                        <button @click="open = !open" 
+                                                type="button"
+                                                id="threshold-button"
+                                                class="px-2 py-1 text-xs bg-purple-500/20 border border-purple-500/30 text-purple-300 rounded-md hover:bg-purple-500/30 transition-all duration-200 flex items-center space-x-1"
+                                                title="Adjust AI search sensitivity">
+                                            <span id="threshold-display">70%</span>
+                                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3">
+                                                <path fill-rule="evenodd" d="M4.22 6.22a.75.75 0 0 1 1.06 0L8 8.94l2.72-2.72a.75.75 0 1 1 1.06 1.06l-3.25 3.25a.75.75 0 0 1-1.06 0L4.22 7.28a.75.75 0 0 1 0-1.06Z" clip-rule="evenodd" />
+                                            </svg>
+                                        </button>
+                                        
+                                        <div x-show="open" 
+                                             @click.away="open = false"
+                                             x-transition:enter="transition ease-out duration-200" 
+                                             x-transition:enter-start="opacity-0 scale-95" 
+                                             x-transition:enter-end="opacity-100 scale-100" 
+                                             x-transition:leave="transition ease-in duration-150" 
+                                             x-transition:leave-start="opacity-100 scale-100" 
+                                             x-transition:leave-end="opacity-0 scale-95"
+                                             class="absolute right-0 mt-2 w-64 bg-slate-800 border border-slate-700 rounded-lg shadow-xl p-4 z-30 backdrop-blur-sm">
+                                            <div class="space-y-3">
+                                                <div>
+                                                    <label class="block text-xs font-medium text-slate-300 mb-2">
+                                                        AI Search Sensitivity
+                                                    </label>
+                                                    <div class="space-y-2">
+                                                                                                <input type="range" 
+                                               id="threshold-slider"
+                                               min="0.3" 
+                                               max="0.9" 
+                                               step="0.05" 
+                                               value="0.35"
+                                               class="w-full h-2 bg-slate-700 rounded-lg appearance-none cursor-pointer slider">
+                                                        <div class="flex justify-between text-xs text-slate-400">
+                                                            <span>More Results</span>
+                                                            <span>Better Matches</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                                <div class="text-xs text-slate-400 leading-relaxed">
+                                                    <div class="flex items-start space-x-2">
+                                                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" fill="currentColor" class="w-3 h-3 mt-0.5 text-slate-500 flex-shrink-0">
+                                                            <path fill-rule="evenodd" d="M15 8A7 7 0 1 1 1 8a7 7 0 0 1 14 0ZM9 5a1 1 0 1 1-2 0 1 1 0 0 1 2 0ZM6.75 8a.75.75 0 0 0 0 1.5h.75v1.75a.75.75 0 0 0 1.5 0v-2.5A.75.75 0 0 0 8.25 8h-1.5Z" clip-rule="evenodd" />
+                                                        </svg>
+                                                                                                            <div>
+                                                        <strong>Lower values</strong> (30-35%): Find more videos, including loosely related content<br>
+                                                        <strong>Higher values</strong> (35-40%): Find fewer, more precisely matching videos
+                                                    </div>
+                                                    </div>
+                                                </div>
+                                                <div class="flex space-x-2">
+                                                    <button onclick="setThresholdPreset(0.3)" 
+                                                            class="flex-1 px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors">
+                                                        Broad
+                                                    </button>
+                                                    <button onclick="setThresholdPreset(0.35)" 
+                                                            class="flex-1 px-2 py-1 text-xs bg-purple-600 hover:bg-purple-500 text-white rounded transition-colors">
+                                                        Balanced
+                                                    </button>
+                                                    <button onclick="setThresholdPreset(0.4)" 
+                                                            class="flex-1 px-2 py-1 text-xs bg-slate-700 hover:bg-slate-600 text-slate-300 rounded transition-colors">
+                                                        Precise
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                            
                             <div id="search-indicator" class="htmx-indicator mr-2">
                                 <div class="animate-spin h-4 w-4 border-2 border-primary border-t-transparent rounded-full"></div>
                             </div>
@@ -206,6 +332,33 @@
         <div id="advanced-search-panel" 
              class="hidden border-t border-slate-700 bg-slate-800/95 backdrop-blur-sm">
             <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-4">
+                <!-- Semantic Search Info -->
+                <div class="mb-4 p-3 bg-purple-500/10 border border-purple-500/20 rounded-lg">
+                    <div class="flex items-start space-x-3">
+                        <div class="flex-shrink-0 mt-0.5">
+                            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-5 h-5 text-purple-400">
+                                <path d="M10 2a8 8 0 100 16 8 8 0 000-16zM9 5a1 1 0 112 0v2a1 1 0 11-2 0V5zM10 12a1 1 0 100-2 1 1 0 000 2z"/>
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="text-sm font-semibold text-purple-300 mb-1">AI-Powered Semantic Search</h4>
+                            <p class="text-xs text-purple-200 leading-relaxed">
+                                Click the <strong>AI</strong> button next to the search bar to enable semantic search. When enabled, you can adjust the sensitivity with the percentage button and use natural language to search video content! 
+                                Try phrases like "videos with people", "outdoor scenes", "cars driving", or "sunset footage". 
+                                The AI will analyze video frames to find matches based on visual content, not just filenames.
+                            </p>
+                            <p class="text-xs text-purple-300 mt-1">
+                                <strong>Note:</strong> Videos must be processed with ML analysis first. <a href="/ml-processing" class="underline hover:text-purple-100">Process videos here</a>.
+                            </p>
+                            <div class="mt-2">
+                                <button onclick="checkSemanticSearchStatus()" class="text-xs bg-purple-600/20 hover:bg-purple-600/30 border border-purple-500/30 text-purple-300 px-2 py-1 rounded transition-colors">
+                                    🔍 Debug AI Search
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+                
                 <form id="advanced-search-form" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 xl:grid-cols-6 gap-4">
                     <!-- Media Type Filter -->
                     <div>
@@ -730,12 +883,277 @@
             }
         });
 
-        // Dispatch custom event to load initial media grid content
+        // AI Search Toggle State
+        let aiSearchEnabled = false;
+        let semanticSearchThreshold = 0.35; // Default threshold (adjusted for new similarity calculation)
+
+        // Toggle AI search function
+        function toggleAISearch() {
+            aiSearchEnabled = !aiSearchEnabled;
+            window.aiSearchEnabled = aiSearchEnabled; // Update global variable
+            
+            console.log('🤖 AI Search Toggle:', {
+                enabled: aiSearchEnabled,
+                threshold: semanticSearchThreshold,
+                timestamp: new Date().toISOString()
+            });
+            
+            updateAISearchToggleUI();
+            updateSearchPlaceholder();
+            updateThresholdControlVisibility();
+            
+            // Save preference to localStorage
+            localStorage.setItem('pabt_ai_search_enabled', aiSearchEnabled.toString());
+            
+            // If there's a current search query, re-run the search with new mode
+            const searchInput = document.getElementById('search-input');
+            if (searchInput && searchInput.value.trim()) {
+                console.log('🔄 Re-running search with new mode:', {
+                    query: searchInput.value.trim(),
+                    aiEnabled: aiSearchEnabled
+                });
+                
+                // Trigger search with current query
+                if (aiSearchEnabled) {
+                    performSemanticSearch(searchInput.value.trim(), 1);
+                } else {
+                    // Trigger regular HTMX search
+                    searchInput.dispatchEvent(new Event('input'));
+                }
+            }
+        }
+
+        // Update AI search toggle UI
+        function updateAISearchToggleUI() {
+            const toggle = document.getElementById('ai-search-toggle');
+            if (!toggle) return;
+            
+            if (aiSearchEnabled) {
+                toggle.classList.remove('bg-slate-700/50', 'border-slate-600', 'text-slate-400');
+                toggle.classList.add('bg-purple-500/20', 'border-purple-500/30', 'text-purple-300');
+                toggle.title = 'AI search enabled - Click to disable';
+            } else {
+                toggle.classList.remove('bg-purple-500/20', 'border-purple-500/30', 'text-purple-300');
+                toggle.classList.add('bg-slate-700/50', 'border-slate-600', 'text-slate-400');
+                toggle.title = 'AI search disabled - Click to enable';
+            }
+        }
+
+        // Update search placeholder based on AI mode
+        function updateSearchPlaceholder() {
+            const searchInput = document.getElementById('search-input');
+            if (!searchInput) return;
+            
+            if (aiSearchEnabled) {
+                searchInput.placeholder = 'Search with AI (e.g., "videos with people", "outdoor scenes")...';
+            } else {
+                searchInput.placeholder = 'Search media files...';
+            }
+        }
+
+        // Update threshold control visibility
+        function updateThresholdControlVisibility() {
+            const thresholdControl = document.getElementById('threshold-control');
+            if (!thresholdControl) return;
+            
+            if (aiSearchEnabled) {
+                thresholdControl.classList.remove('hidden');
+            } else {
+                thresholdControl.classList.add('hidden');
+            }
+        }
+
+        // Update threshold display
+        function updateThresholdDisplay() {
+            const thresholdDisplay = document.getElementById('threshold-display');
+            const thresholdSlider = document.getElementById('threshold-slider');
+            
+            if (thresholdDisplay) {
+                thresholdDisplay.textContent = Math.round(semanticSearchThreshold * 100) + '%';
+            }
+            
+            if (thresholdSlider) {
+                thresholdSlider.value = semanticSearchThreshold;
+            }
+        }
+
+        // Set threshold preset
+        function setThresholdPreset(value) {
+            const oldThreshold = semanticSearchThreshold;
+            semanticSearchThreshold = value;
+            
+            console.log('🎯 Threshold Preset Changed:', {
+                from: oldThreshold,
+                to: value,
+                preset: value === 0.3 ? 'Broad' : value === 0.35 ? 'Balanced' : value === 0.4 ? 'Precise' : 'Custom',
+                timestamp: new Date().toISOString()
+            });
+            
+            updateThresholdDisplay();
+            saveThresholdPreference();
+            
+            // Re-run search if there's an active query
+            const searchInput = document.getElementById('search-input');
+            if (searchInput && searchInput.value.trim() && aiSearchEnabled) {
+                console.log('🔄 Re-running search with new threshold:', {
+                    query: searchInput.value.trim(),
+                    newThreshold: value
+                });
+                performSemanticSearch(searchInput.value.trim(), 1);
+            }
+        }
+
+        // Save threshold preference
+        function saveThresholdPreference() {
+            localStorage.setItem('pabt_semantic_threshold', semanticSearchThreshold.toString());
+        }
+
+                    // Load threshold preference
+            function loadThresholdPreference() {
+                const saved = localStorage.getItem('pabt_semantic_threshold');
+                if (saved) {
+                    const value = parseFloat(saved);
+                    if (value >= 0.3 && value <= 0.9) {
+                        semanticSearchThreshold = value;
+                    }
+                } else {
+                    // Set default for new users
+                    semanticSearchThreshold = 0.35;
+                }
+            }
+
+        // Initialize threshold slider
+        function initializeThresholdSlider() {
+            const thresholdSlider = document.getElementById('threshold-slider');
+            if (!thresholdSlider) return;
+            
+            thresholdSlider.addEventListener('input', function() {
+                semanticSearchThreshold = parseFloat(this.value);
+                updateThresholdDisplay();
+            });
+            
+            thresholdSlider.addEventListener('change', function() {
+                console.log('🎚️ Threshold Slider Changed:', {
+                    value: semanticSearchThreshold,
+                    percentage: Math.round(semanticSearchThreshold * 100) + '%',
+                    timestamp: new Date().toISOString()
+                });
+                
+                saveThresholdPreference();
+                
+                // Re-run search if there's an active query
+                const searchInput = document.getElementById('search-input');
+                if (searchInput && searchInput.value.trim() && aiSearchEnabled) {
+                    console.log('🔄 Debouncing search with new threshold:', {
+                        query: searchInput.value.trim(),
+                        newThreshold: semanticSearchThreshold,
+                        debounceDelay: '500ms'
+                    });
+                    
+                    // Debounce the search to avoid too many requests
+                    clearTimeout(window.thresholdSearchTimeout);
+                    window.thresholdSearchTimeout = setTimeout(() => {
+                        performSemanticSearch(searchInput.value.trim(), 1);
+                    }, 500);
+                }
+            });
+        }
+
+
+
+        // Check semantic search status (debug function)
+        async function checkSemanticSearchStatus() {
+            console.log('🔍 Checking semantic search status...');
+            
+            try {
+                const response = await fetch('/api/semantic-search/debug');
+                const debugInfo = await response.json();
+                
+                console.group('🔍 Semantic Search Debug Info');
+                console.log('Full debug info:', debugInfo);
+                console.groupEnd();
+                
+                // Create a detailed status message
+                let statusMessage = '🔍 AI Search Debug Results:\n\n';
+                
+                // ChromaDB status
+                statusMessage += `📊 ChromaDB: ${debugInfo.chromadb.available ? '✅ Available' : '❌ Not Available'}\n`;
+                if (debugInfo.chromadb.stats) {
+                    statusMessage += `   - Total frames: ${debugInfo.chromadb.stats.total_frames || 0}\n`;
+                    statusMessage += `   - Videos with embeddings: ${debugInfo.chromadb.stats.unique_videos || 0}\n`;
+                }
+                
+                // Sentence Transformers status
+                statusMessage += `\n🤖 Sentence Transformers: ${debugInfo.sentence_transformers.available ? '✅ Available' : '❌ Not Available'}\n`;
+                statusMessage += `   - Model loadable: ${debugInfo.sentence_transformers.model_loadable ? '✅ Yes' : '❌ No'}\n`;
+                if (debugInfo.sentence_transformers.model_error) {
+                    statusMessage += `   - Error: ${debugInfo.sentence_transformers.model_error}\n`;
+                }
+                
+                // Video database status
+                statusMessage += `\n🗃️ Video Database:\n`;
+                statusMessage += `   - Total videos: ${debugInfo.videos.total_videos}\n`;
+                statusMessage += `   - Videos with ML analysis: ${debugInfo.videos.videos_with_ml_analysis}\n`;
+                
+                // Recommendations
+                if (debugInfo.recommendations.length > 0) {
+                    statusMessage += `\n💡 Recommendations:\n`;
+                    debugInfo.recommendations.forEach((rec, index) => {
+                        statusMessage += `   ${index + 1}. ${rec}\n`;
+                    });
+                }
+                
+                // Show the status in an alert (you could make this a nicer modal)
+                alert(statusMessage);
+                
+            } catch (error) {
+                console.error('Error checking semantic search status:', error);
+                alert('❌ Error checking AI search status. Check the console for details.');
+            }
+        }
+
+        // Initialize AI search toggle on page load
         document.addEventListener('DOMContentLoaded', function() {
+            console.group('🚀 AI Search Initialization');
+            
+            // Load saved preferences
+            const savedAISearchEnabled = localStorage.getItem('pabt_ai_search_enabled');
+            if (savedAISearchEnabled === 'true') {
+                aiSearchEnabled = true;
+            }
+            
+            loadThresholdPreference();
+            
+            console.log('⚙️ Loaded Settings:', {
+                aiSearchEnabled: aiSearchEnabled,
+                semanticSearchThreshold: semanticSearchThreshold,
+                thresholdPercentage: Math.round(semanticSearchThreshold * 100) + '%',
+                savedAISearchEnabled: savedAISearchEnabled,
+                savedThreshold: localStorage.getItem('pabt_semantic_threshold'),
+                timestamp: new Date().toISOString()
+            });
+            
+            // Make functions globally accessible for file_list.html
+            window.aiSearchEnabled = aiSearchEnabled;
+            window.toggleAISearch = toggleAISearch;
+            window.semanticSearchThreshold = semanticSearchThreshold;
+            window.checkSemanticSearchStatus = checkSemanticSearchStatus;
+            
+            // Initialize UI
+            updateAISearchToggleUI();
+            updateSearchPlaceholder();
+            updateThresholdControlVisibility();
+            updateThresholdDisplay();
+            initializeThresholdSlider();
+            
+            // Dispatch custom event to load initial media grid content
             const mediaGrid = document.getElementById('media-grid');
             if (mediaGrid) {
                 mediaGrid.dispatchEvent(new CustomEvent('load_initial_media'));
             }
+            
+            console.log('✅ AI Search initialization completed');
+            console.groupEnd();
         });
     </script>
 </body>

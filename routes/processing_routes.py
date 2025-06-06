@@ -348,4 +348,40 @@ async def delete_specific_preview_route(video_name: str, request: Request):
     updated_video_details, _, _ = get_single_video_details_from_db(video_name)
     context = {"request": request, "video": updated_video_details}
     if error_message: context["error_message"] = error_message
-    return templates.TemplateResponse("_video_metadata_sidebar.html", context) 
+    return templates.TemplateResponse("_video_metadata_sidebar.html", context)
+
+# --- ML Analysis Endpoints & Background Tasks ---
+@router.post("/process-all-videos-ml-analysis")
+async def process_all_videos_ml_analysis_endpoint(
+    background_tasks: BackgroundTasks,
+    frame_interval: int = Form(100),
+    model_name: str = Form("clip-ViT-B-32"),
+    skip_existing: bool = Form(True)
+):
+    """Start ML analysis processing for all videos"""
+    try:
+        from ml_processing import process_all_videos_for_ml_analysis
+        
+        # Create background job
+        job = create_background_job(
+            "ml_analysis_all",
+            f"ML Analysis for all videos (every {frame_interval} frames, model: {model_name})"
+        )
+        
+        # Start processing in background
+        background_tasks.add_task(
+            process_all_videos_for_ml_analysis,
+            job,
+            frame_interval,
+            model_name,
+            skip_existing
+        )
+        
+        return {
+            "job_id": job.job_id,
+            "message": f"Started ML analysis for all videos (frame interval: {frame_interval}, model: {model_name})"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error starting bulk ML analysis: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) 

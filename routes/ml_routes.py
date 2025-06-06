@@ -1,13 +1,17 @@
 from fastapi import APIRouter, Request, HTTPException, BackgroundTasks, Form, Query
 from fastapi.responses import HTMLResponse, JSONResponse
 from pathlib import Path
-from typing import Optional
+from typing import Optional, List
 import json
 
 from config import templates, MEDIA_DIR, BASE_DIR, logger
 from data_access import get_media_files_from_db, get_single_video_details_from_db
 from jobs_manager import create_background_job
-from ml_processing import process_video_frames_with_embeddings, cleanup_video_analysis
+from ml_processing import (
+    process_video_frames_with_embeddings, cleanup_video_analysis,
+    find_similar_frames, get_video_embeddings_from_chroma, 
+    get_chroma_collection_stats, migrate_existing_embeddings_to_chroma
+)
 
 router = APIRouter()
 
@@ -193,4 +197,103 @@ async def delete_video_ml_analysis(video_id: int, request: Request):
                     return templates.TemplateResponse("_video_metadata_sidebar.html", context)
         except:
             pass
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/api/chroma-stats", response_class=JSONResponse)
+async def get_chroma_stats():
+    """Get ChromaDB collection statistics"""
+    try:
+        stats = get_chroma_collection_stats()
+        return stats
+    except Exception as e:
+        logger.error(f"Error getting ChromaDB stats: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/migrate-embeddings", response_class=JSONResponse)
+async def migrate_embeddings_to_chroma():
+    """Migrate existing JSON embeddings to ChromaDB"""
+    try:
+        result = migrate_existing_embeddings_to_chroma()
+        return result
+    except Exception as e:
+        logger.error(f"Error migrating embeddings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.get("/video/{video_id}/embeddings", response_class=JSONResponse)
+async def get_video_embeddings(video_id: int):
+    """Get video embeddings from ChromaDB"""
+    try:
+        embeddings_data = get_video_embeddings_from_chroma(video_id)
+        if embeddings_data:
+            return {
+                "has_embeddings": True,
+                "data": embeddings_data
+            }
+        else:
+            return {
+                "has_embeddings": False,
+                "message": "No embeddings found for this video"
+            }
+    except Exception as e:
+        logger.error(f"Error getting video embeddings: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/similarity-search", response_class=JSONResponse)
+async def similarity_search(
+    query_embedding: List[float] = Form(...),
+    n_results: int = Form(10),
+    video_id: Optional[int] = Form(None)
+):
+    """Find similar frames using vector similarity search"""
+    try:
+        # Convert string representation to list if needed
+        if isinstance(query_embedding, str):
+            import json
+            query_embedding = json.loads(query_embedding)
+        
+        similar_frames = find_similar_frames(
+            query_embedding=query_embedding,
+            n_results=n_results,
+            video_id=video_id
+        )
+        
+        return {
+            "similar_frames": similar_frames,
+            "query_info": {
+                "n_results": n_results,
+                "video_id": video_id,
+                "embedding_dimension": len(query_embedding)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error performing similarity search: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/semantic-search", response_class=JSONResponse)
+async def semantic_search(
+    query_text: str = Form(...),
+    n_results: int = Form(20),
+    similarity_threshold: float = Form(0.7)
+):
+    """Search for videos using natural language queries against frame embeddings"""
+    try:
+        from ml_processing import semantic_search_videos
+        
+        results = semantic_search_videos(
+            query_text=query_text,
+            n_results=n_results,
+            similarity_threshold=similarity_threshold
+        )
+        
+        return {
+            "videos": results,
+            "query_info": {
+                "query_text": query_text,
+                "n_results": n_results,
+                "similarity_threshold": similarity_threshold,
+                "total_matches": len(results)
+            }
+        }
+    except Exception as e:
+        logger.error(f"Error performing semantic search: {e}")
         raise HTTPException(status_code=500, detail=str(e)) 

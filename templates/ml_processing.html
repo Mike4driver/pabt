@@ -122,6 +122,40 @@
                 <p class="text-slate-400">Extract frames from videos and generate embeddings using machine learning models</p>
             </div>
 
+            <!-- ChromaDB Status Section -->
+            <div class="mb-6 bg-slate-800 rounded-lg border border-slate-700 p-4">
+                <div class="flex items-center justify-between mb-3">
+                    <h2 class="text-lg font-semibold text-slate-100 flex items-center">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="w-5 h-5 mr-2 text-primary">
+                            <path d="M20.25 6.375c0 2.278-3.694 4.125-8.25 4.125S3.75 8.653 3.75 6.375m16.5 0c0-2.278-3.694-4.125-8.25-4.125S3.75 4.097 3.75 6.375m16.5 0v11.25c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375m16.5 0v3.75c0 2.278-3.694 4.125-8.25 4.125s-8.25-1.847-8.25-4.125V6.375"/>
+                        </svg>
+                        Vector Database Status
+                    </h2>
+                    <button onclick="refreshChromaStats()" class="text-slate-400 hover:text-slate-200 text-sm">
+                        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20" fill="currentColor" class="w-4 h-4">
+                            <path fill-rule="evenodd" d="M4 2a1 1 0 011 1v2.101a7.002 7.002 0 0111.601 2.566 1 1 0 11-1.885.666A5.002 5.002 0 005.999 7H9a1 1 0 010 2H4a1 1 0 01-1-1V3a1 1 0 011-1zm.008 9.057a1 1 0 011.276.61A5.002 5.002 0 0014.001 13H11a1 1 0 110-2h5a1 1 0 011 1v5a1 1 0 11-2 0v-2.101a7.002 7.002 0 01-11.601-2.566 1 1 0 01.61-1.276z" clip-rule="evenodd" />
+                        </svg>
+                    </button>
+                </div>
+                <div id="chroma-status" class="grid grid-cols-1 md:grid-cols-3 gap-4 text-sm">
+                    <div class="text-center py-2">
+                        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-primary mx-auto mb-2"></div>
+                        <p class="text-slate-400">Loading status...</p>
+                    </div>
+                </div>
+                <div id="migration-section" class="mt-4 pt-4 border-t border-slate-700" style="display: none;">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="text-sm font-medium text-slate-200">Migration Available</h3>
+                            <p class="text-xs text-slate-400">Migrate existing JSON embeddings to ChromaDB for better performance</p>
+                        </div>
+                        <button onclick="migrateEmbeddings()" id="migrate-btn" class="btn-base btn-secondary bg-amber-600 hover:bg-amber-500 text-sm py-2 px-4">
+                            Migrate Data
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <!-- Main Content -->
             <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <!-- Video Selection Panel -->
@@ -312,8 +346,19 @@
             // Load saved sorting preferences
             loadSortingPreferences();
             
-            loadVideos();
+            // Check for preselected video ID from URL parameter
+            const urlParams = new URLSearchParams(window.location.search);
+            const preselectedVideoId = urlParams.get('video_id');
+            
+            loadVideos().then(() => {
+                // If there's a preselected video ID, select it after videos are loaded
+                if (preselectedVideoId) {
+                    selectVideoById(parseInt(preselectedVideoId));
+                }
+            });
+            
             refreshMlJobs();
+            refreshChromaStats();
             
             // Add keyboard support for search
             const searchInput = document.getElementById('video-search-input');
@@ -342,12 +387,14 @@
                 
                 if (allVideos.length === 0) {
                     showEmptyState();
-                    return;
+                    return Promise.resolve();
                 }
                 
                 // Render the videos
                 renderVideoList(filteredVideos);
                 updateSearchSummary();
+                
+                return Promise.resolve();
                 
             } catch (error) {
                 console.error('Error loading videos:', error);
@@ -360,6 +407,7 @@
                         <p class="text-sm">Please try refreshing the page</p>
                     </div>
                 `;
+                return Promise.reject(error);
             }
         }
 
@@ -448,7 +496,12 @@
             });
             
             const selectedItem = document.querySelector(`[data-video-id="${videoId}"]`);
-            selectedItem.classList.add('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
+            if (selectedItem) {
+                selectedItem.classList.add('ring-2', 'ring-primary', 'bg-primary/10', 'selected');
+                
+                // Scroll the selected video into view
+                selectedItem.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
             
             // Show processing form
             document.getElementById('selected-video-id').value = videoId;
@@ -465,6 +518,36 @@
             
             // Check if analysis already exists
             checkExistingAnalysis(videoId);
+        }
+
+        function selectVideoById(videoId) {
+            // Find the video in the loaded videos array
+            const video = allVideos.find(v => v.id === videoId);
+            if (video) {
+                // Clear any existing search to ensure the video is visible
+                const searchInput = document.getElementById('video-search-input');
+                if (searchInput.value.trim()) {
+                    searchInput.value = '';
+                    filterVideos('');
+                }
+                
+                // Select the video
+                selectVideo(video.id, video.display_title, video.filename);
+                
+                // Show a toast notification
+                showToast(
+                    `Video "${video.display_title}" has been preselected for ML processing.`,
+                    'Video Preselected',
+                    'info'
+                );
+            } else {
+                console.warn(`Video with ID ${videoId} not found in loaded videos`);
+                showToast(
+                    'The requested video could not be found. It may have been moved or deleted.',
+                    'Video Not Found',
+                    'error'
+                );
+            }
         }
 
         async function checkExistingAnalysis(videoId) {
@@ -1038,6 +1121,108 @@
                 localStorage.setItem('pabt_search_filters', JSON.stringify(filters));
             } catch (error) {
                 console.error('Error saving sorting preferences:', error);
+            }
+        }
+
+        // ChromaDB Status and Management Functions
+        async function refreshChromaStats() {
+            try {
+                const response = await fetch('/ml/api/chroma-stats');
+                const stats = await response.json();
+                updateChromaStatusDisplay(stats);
+            } catch (error) {
+                console.error('Error fetching ChromaDB stats:', error);
+                document.getElementById('chroma-status').innerHTML = `
+                    <div class="col-span-3 text-center py-4 text-red-400">
+                        <p>Error loading ChromaDB status</p>
+                    </div>
+                `;
+            }
+        }
+
+        function updateChromaStatusDisplay(stats) {
+            const statusDiv = document.getElementById('chroma-status');
+            const migrationSection = document.getElementById('migration-section');
+            
+            if (stats.available) {
+                statusDiv.innerHTML = `
+                    <div class="bg-green-500/10 border border-green-500/20 rounded-lg p-3 text-center">
+                        <div class="text-green-400 font-medium mb-1">Status</div>
+                        <div class="text-green-300 text-xs">✓ Available</div>
+                    </div>
+                    <div class="bg-blue-500/10 border border-blue-500/20 rounded-lg p-3 text-center">
+                        <div class="text-blue-400 font-medium mb-1">Total Frames</div>
+                        <div class="text-blue-300 text-lg font-bold">${stats.total_frames.toLocaleString()}</div>
+                    </div>
+                    <div class="bg-purple-500/10 border border-purple-500/20 rounded-lg p-3 text-center">
+                        <div class="text-purple-400 font-medium mb-1">Videos</div>
+                        <div class="text-purple-300 text-lg font-bold">${stats.unique_videos}</div>
+                    </div>
+                `;
+                
+                // Check if migration is needed (this would require additional logic to detect JSON files)
+                // For now, we'll show migration option if there are fewer than expected videos
+                // This is a simplified check - in practice you'd want to compare with file system
+                migrationSection.style.display = 'none'; // Hide for now, can be enabled based on specific conditions
+            } else {
+                statusDiv.innerHTML = `
+                    <div class="col-span-3 bg-red-500/10 border border-red-500/20 rounded-lg p-4 text-center">
+                        <div class="text-red-400 font-medium mb-2">ChromaDB Unavailable</div>
+                        <div class="text-red-300 text-sm">${stats.error || 'Vector database is not accessible'}</div>
+                        <div class="text-xs text-slate-400 mt-2">Embeddings will be stored in JSON format only</div>
+                    </div>
+                `;
+                migrationSection.style.display = 'none';
+            }
+        }
+
+        async function migrateEmbeddings() {
+            const migrateBtn = document.getElementById('migrate-btn');
+            const originalText = migrateBtn.innerHTML;
+            
+            try {
+                migrateBtn.disabled = true;
+                migrateBtn.innerHTML = `
+                    <div class="animate-spin rounded-full h-4 w-4 border-b-2 border-white mr-2"></div>
+                    Migrating...
+                `;
+                
+                const response = await fetch('/ml/api/migrate-embeddings', {
+                    method: 'POST'
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    showToast(
+                        `Successfully migrated ${result.migrated_count} video embeddings to ChromaDB`,
+                        'Migration Complete',
+                        'success'
+                    );
+                    
+                    // Refresh stats to show updated counts
+                    refreshChromaStats();
+                    
+                    // Hide migration section
+                    document.getElementById('migration-section').style.display = 'none';
+                } else {
+                    showToast(
+                        `Migration completed with ${result.failed_count} errors. ${result.migrated_count} videos migrated successfully.`,
+                        'Migration Completed with Errors',
+                        'error'
+                    );
+                }
+                
+            } catch (error) {
+                console.error('Error during migration:', error);
+                showToast(
+                    'Failed to migrate embeddings. Please try again.',
+                    'Migration Error',
+                    'error'
+                );
+            } finally {
+                migrateBtn.disabled = false;
+                migrateBtn.innerHTML = originalText;
             }
         }
 

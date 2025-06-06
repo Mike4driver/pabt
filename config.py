@@ -51,13 +51,27 @@ def mount_static_files(app):
 
 # --- Utility Functions ---
 def slugify_for_id(value: str) -> str:
+    import hashlib
+    
+    # Store original value for hash generation if needed
+    original_value = value
+    
     # Remove characters that are not alphanumeric, underscores, or hyphens
     value = re.sub(r'[^\\w\\s-]', '', value).strip().lower()
     # Replace whitespace and sequences of hyphens with a single hyphen
     value = re.sub(r'[-\\s]+', '-', value)
-    # Ensure it starts with a letter (important for CSS IDs)
+    # Remove leading/trailing hyphens
+    value = value.strip('-')
+    
+    # If the result is empty or doesn't start with a letter, create a hash-based ID
     if not value or not value[0].isalpha():
-        value = "id-" + value
+        # Create a hash of the original filename for uniqueness
+        hash_suffix = hashlib.md5(original_value.encode('utf-8')).hexdigest()[:8]
+        if value:
+            value = f"id-{value}-{hash_suffix}"
+        else:
+            value = f"id-{hash_suffix}"
+    
     return value
 
 templates.env.filters['slugify_for_id'] = slugify_for_id # Add to Jinja environment

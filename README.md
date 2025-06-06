@@ -41,13 +41,25 @@ A web-based application for browsing, managing, and processing media files (vide
 *   **Frame Extraction & Analysis:**
     *   Extract frames from videos at configurable intervals (every 30th, 60th, 100th, etc. frame).
     *   Generate embeddings for extracted frames using CLIP models (ViT-B/32, ViT-L/14, ViT-B/16).
-    *   Store frame embeddings and metadata in JSON format for future analysis.
+    *   Store frame embeddings in both JSON format and ChromaDB vector database for optimal performance.
     *   Background processing with real-time progress tracking.
     *   Support for multiple ML models via sentence-transformers library.
+*   **AI-Powered Semantic Search:**
+    *   Search videos using natural language queries (e.g., "videos with people", "outdoor scenes", "cars driving").
+    *   Automatic detection of semantic search queries vs. traditional filename searches.
+    *   Vector similarity search using ChromaDB for fast, accurate results.
+    *   Visual similarity scoring and ranking of search results.
+    *   Seamless integration with existing search interface.
+*   **Vector Database Integration:**
+    *   ChromaDB for high-performance vector storage and similarity search.
+    *   Dual storage system: ChromaDB for performance + JSON for compatibility.
+    *   Migration tools for existing embeddings data.
+    *   Collection statistics and health monitoring.
 *   **ML Dependencies:**
     *   Uses sentence-transformers for generating image embeddings.
     *   Supports CLIP models for vision-language understanding.
     *   Requires PyTorch for model inference.
+    *   ChromaDB for vector database operations.
 
 ### Settings & Configuration
 *   **Database-Driven Settings:**
@@ -73,6 +85,33 @@ A web-based application for browsing, managing, and processing media files (vide
     *   Real-time progress updates for background operations.
 
 ## Setup
+
+### Option 1: Docker (Recommended)
+
+The easiest way to run PABT is using Docker, which includes all dependencies:
+
+1.  **Clone the Repository:**
+    ```bash
+    git clone <repository_url>
+    cd <repository_directory>
+    ```
+
+2.  **Create necessary directories:**
+    ```bash
+    mkdir -p media media_transcoded ml_analysis data static/previews static/thumbnails
+    ```
+
+3.  **Run with Docker Compose:**
+    ```bash
+    docker-compose up --build
+    ```
+
+4.  **Access the application:**
+    Open your browser and go to `http://localhost:8000`
+
+For detailed Docker setup instructions, see [DOCKER.md](DOCKER.md).
+
+### Option 2: Manual Installation
 
 1.  **Clone the Repository:**
     ```bash

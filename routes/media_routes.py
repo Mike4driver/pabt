@@ -65,6 +65,130 @@ async def get_all_tags_api(): # Renamed to avoid conflict if get_all_tags_from_d
     tags = get_all_tags_from_db()
     return {"tags": tags}
 
+@router.get("/api/semantic-search/debug", response_class=JSONResponse)
+async def semantic_search_debug():
+    """Debug endpoint to check semantic search capabilities"""
+    try:
+        from ml_processing import chroma_manager
+        from data_access import get_media_files_from_db
+        
+        # Check ChromaDB status
+        chroma_available = chroma_manager.is_available()
+        chroma_stats = chroma_manager.get_collection_stats()
+        
+        # Check for videos with ML analysis
+        all_videos = get_media_files_from_db(media_type_filter="video", page=1, per_page=1000)
+        videos_with_ml = [v for v in all_videos['media_files'] if v.get('has_ml_analysis')]
+        
+        # Check sentence transformers
+        try:
+            from sentence_transformers import SentenceTransformer
+            st_available = True
+            try:
+                # Try to load the default model
+                model = SentenceTransformer("clip-ViT-B-32")
+                model_loadable = True
+            except Exception as e:
+                model_loadable = False
+                model_error = str(e)
+        except ImportError as e:
+            st_available = False
+            model_loadable = False
+            model_error = str(e)
+        
+        debug_info = {
+            "chromadb": {
+                "available": chroma_available,
+                "stats": chroma_stats
+            },
+            "sentence_transformers": {
+                "available": st_available,
+                "model_loadable": model_loadable,
+                "model_error": model_error if not model_loadable else None
+            },
+            "videos": {
+                "total_videos": len(all_videos['media_files']),
+                "videos_with_ml_analysis": len(videos_with_ml),
+                "ml_analysis_video_ids": [v['id_db'] for v in videos_with_ml]
+            },
+            "recommendations": []
+        }
+        
+        # Add recommendations based on findings
+        if not chroma_available:
+            debug_info["recommendations"].append("ChromaDB is not available. Check if it's properly initialized.")
+        
+        if chroma_stats.get("total_frames", 0) == 0:
+            debug_info["recommendations"].append("No frame embeddings found in ChromaDB. Process videos with ML analysis first.")
+        
+        if not st_available:
+            debug_info["recommendations"].append("Sentence Transformers not available. Install with: pip install sentence-transformers")
+        
+        if not model_loadable:
+            debug_info["recommendations"].append("Cannot load CLIP model. Check internet connection or model cache.")
+        
+        if len(videos_with_ml) == 0:
+            debug_info["recommendations"].append("No videos have been processed with ML analysis. Go to ML Processing page to analyze videos.")
+        
+        return debug_info
+        
+    except Exception as e:
+        logger.error(f"Error in semantic search debug: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/semantic-search", response_class=JSONResponse)
+async def semantic_search_media(
+    query_text: str = Form(...),
+    page: int = Form(1),
+    per_page: int = Form(20),
+    similarity_threshold: float = Form(0.7)
+):
+    """Search for videos using natural language queries against frame embeddings"""
+    try:
+        from ml_processing import semantic_search_videos
+        
+        # Perform semantic search
+        semantic_results = semantic_search_videos(
+            query_text=query_text,
+            n_results=per_page * 3,  # Get more results to account for pagination
+            similarity_threshold=similarity_threshold
+        )
+        
+        # Apply pagination to semantic results
+        total_count = len(semantic_results)
+        start_idx = (page - 1) * per_page
+        end_idx = start_idx + per_page
+        paginated_results = semantic_results[start_idx:end_idx]
+        
+        # Create pagination info
+        pagination = {
+            "page": page,
+            "per_page": per_page,
+            "total_count": total_count,
+            "total_pages": (total_count + per_page - 1) // per_page,
+            "has_prev": page > 1,
+            "has_next": page * per_page < total_count,
+            "prev_page": page - 1 if page > 1 else None,
+            "next_page": page + 1 if page * per_page < total_count else None
+        }
+        
+        return {
+            "media_files": paginated_results,
+            "pagination": pagination,
+            "search_type": "semantic",
+            "query_text": query_text,
+            "similarity_threshold": similarity_threshold,
+            "query_info": {
+                "total_frames_searched": len(semantic_results) * 5 if semantic_results else 0,  # Estimate
+                "threshold_used": similarity_threshold,
+                "model_used": "clip-ViT-B-32"  # Default, could be detected
+            }
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in semantic search: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
 @router.get("/media_content/{file_name:path}")
 async def serve_media_file(file_name: str, request: Request): # request param might not be needed
     file_path = safe_path_join(MEDIA_DIR, file_name)
@@ -91,7 +215,8 @@ async def video_player_page(
     media_type: str = Query(None),
     tags: str = Query(None),
     sort_by: str = Query("date_added"),
-    sort_order: str = Query("desc")
+    sort_order: str = Query("desc"),
+    t: float = Query(None, description="Start time in seconds")
 ):
     tags_filter = None
     if tags:
@@ -126,7 +251,8 @@ async def video_player_page(
         "current_media_type": media_type or "",
         "current_tags": tags or "",
         "current_sort_by": sort_by,
-        "current_sort_order": sort_order
+        "current_sort_order": sort_order,
+        "start_time": t
     })
 
 @router.post("/video/{video_id_db}/metadata", name="update_video_metadata")
@@ -291,4 +417,282 @@ async def delete_media_file_route(video_id_db: int, response: Response):
             return {"message": "Media file record deleted, but some associated files could not be deleted. Redirecting...", "failed_files": failed_files, "redirect_url": "/"}
         else:
             response.headers["HX-Redirect"] = "/"
-            return {"message": f"Media file and all associated assets deleted for ID {video_id_db}. Redirecting...", "redirect_url": "/"} 
+            return {"message": f"Media file and all associated assets deleted for ID {video_id_db}. Redirecting...", "redirect_url": "/"}
+
+@router.post("/api/extract-frames/{video_name:path}", response_class=JSONResponse)
+async def extract_video_frames(
+    video_name: str,
+    timestamps: str = Form(...),  # Comma-separated timestamps in seconds
+    max_frames: int = Form(10)
+):
+    """Extract frames from video at specific timestamps for semantic search"""
+    try:
+        import tempfile
+        import subprocess
+        from pathlib import Path
+        import base64
+        
+        # Get video path
+        video_path = safe_path_join(MEDIA_DIR, video_name)
+        if not video_path.exists():
+            raise HTTPException(status_code=404, detail="Video not found")
+        
+        # Get video duration first
+        try:
+            duration_cmd = [
+                'ffprobe', '-v', 'quiet', '-show_entries', 'format=duration',
+                '-of', 'csv=p=0', str(video_path)
+            ]
+            duration_result = subprocess.run(duration_cmd, capture_output=True, text=True, timeout=10)
+            if duration_result.returncode == 0:
+                video_duration = float(duration_result.stdout.strip())
+            else:
+                video_duration = None
+        except:
+            video_duration = None
+        
+        # Parse timestamps
+        try:
+            timestamp_list = [float(t.strip()) for t in timestamps.split(',') if t.strip()]
+        except ValueError:
+            raise HTTPException(status_code=400, detail="Invalid timestamp format")
+        
+        # Filter timestamps to be within video duration
+        if video_duration:
+            original_count = len(timestamp_list)
+            timestamp_list = [t for t in timestamp_list if 0 <= t < video_duration]
+            if len(timestamp_list) < original_count:
+                logger.warning(f"Filtered {original_count - len(timestamp_list)} timestamps outside video duration ({video_duration}s)")
+        
+        # Limit number of frames
+        timestamp_list = timestamp_list[:max_frames]
+        
+        if not timestamp_list:
+            raise HTTPException(status_code=400, detail="No valid timestamps within video duration")
+        
+        # Create temporary directory for frames
+        with tempfile.TemporaryDirectory() as temp_dir:
+            temp_path = Path(temp_dir)
+            extracted_frames = []
+            
+            for i, timestamp in enumerate(timestamp_list):
+                frame_filename = f"frame_{i:03d}.jpg"
+                frame_path = temp_path / frame_filename
+                
+                # Extract frame at specific timestamp using FFmpeg
+                cmd = [
+                    'ffmpeg',
+                    '-i', str(video_path),
+                    '-ss', str(timestamp),  # Seek to timestamp
+                    '-vframes', '1',  # Extract only 1 frame
+                    '-q:v', '2',  # High quality
+                    '-y',  # Overwrite output file
+                    str(frame_path)
+                ]
+                
+                try:
+                    result = subprocess.run(
+                        cmd,
+                        capture_output=True,
+                        text=True,
+                        timeout=30
+                    )
+                    
+                    if result.returncode == 0 and frame_path.exists():
+                        # Read frame and convert to base64
+                        with open(frame_path, 'rb') as f:
+                            frame_data = f.read()
+                            frame_base64 = base64.b64encode(frame_data).decode('utf-8')
+                        
+                        extracted_frames.append({
+                            "timestamp": timestamp,
+                            "frame_index": i,
+                            "frame_data": f"data:image/jpeg;base64,{frame_base64}",
+                            "size": len(frame_data)
+                        })
+                    else:
+                        logger.warning(f"Failed to extract frame at {timestamp}s: {result.stderr}")
+                        
+                except subprocess.TimeoutExpired:
+                    logger.error(f"Timeout extracting frame at {timestamp}s")
+                except Exception as e:
+                    logger.error(f"Error extracting frame at {timestamp}s: {e}")
+        
+        return {
+            "video_name": video_name,
+            "extracted_frames": extracted_frames,
+            "total_frames": len(extracted_frames),
+            "requested_timestamps": timestamp_list
+        }
+        
+    except Exception as e:
+        logger.error(f"Error extracting frames from {video_name}: {e}")
+        raise HTTPException(status_code=500, detail=str(e))
+
+@router.post("/api/semantic-search-by-frame", response_class=JSONResponse)
+async def semantic_search_by_frame(
+    frame_data: str = Form(...),  # Base64 encoded image data
+    similarity_threshold: float = Form(0.35),
+    max_results: int = Form(20)
+):
+    """Perform semantic search using a frame image"""
+    try:
+        import base64
+        import tempfile
+        from PIL import Image
+        import io
+        
+        # Decode base64 image
+        try:
+            # Remove data URL prefix if present
+            if frame_data.startswith('data:image'):
+                frame_data = frame_data.split(',')[1]
+            
+            image_bytes = base64.b64decode(frame_data)
+            image = Image.open(io.BytesIO(image_bytes))
+            
+            # Convert to RGB if necessary
+            if image.mode != 'RGB':
+                image = image.convert('RGB')
+                
+        except Exception as e:
+            raise HTTPException(status_code=400, detail=f"Invalid image data: {e}")
+        
+        # Generate embedding for the frame
+        try:
+            from sentence_transformers import SentenceTransformer
+            
+            # Load CLIP model (should match the model used for stored embeddings)
+            model_name = "clip-ViT-B-32"
+            model = SentenceTransformer(model_name)
+            
+            # Generate embedding
+            frame_embedding = model.encode(image).tolist()
+            
+        except ImportError as e:
+            raise HTTPException(status_code=500, detail=f"ML libraries not available: {e}")
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Error generating embedding: {e}")
+        
+        # Perform similarity search
+        from ml_processing import chroma_manager
+        
+        if not chroma_manager.is_available():
+            raise HTTPException(status_code=500, detail="ChromaDB not available")
+        
+        # Search for similar frames
+        similar_frames = chroma_manager.find_similar_frames(
+            query_embedding=frame_embedding,
+            n_results=max_results * 3,  # Get more frames to aggregate by video
+            video_id=None  # Search across all videos
+        )
+        
+        # Group results by video and calculate video-level scores
+        video_scores = {}
+        video_best_frames = {}  # Store best frame info for each video
+        frames_above_threshold = 0
+        
+        for frame in similar_frames:
+            video_id = frame["video_id"]
+            similarity_score = frame["similarity_score"]
+            
+            # Only include frames above the similarity threshold
+            if similarity_score >= similarity_threshold:
+                frames_above_threshold += 1
+                if video_id not in video_scores:
+                    video_scores[video_id] = []
+                    video_best_frames[video_id] = []
+                
+                video_scores[video_id].append(similarity_score)
+                video_best_frames[video_id].append({
+                    "similarity_score": similarity_score,
+                    "timestamp": frame["timestamp"],
+                    "frame_number": frame["frame_number"]
+                })
+        
+        # Calculate aggregated scores for each video
+        video_results = []
+        for video_id, scores in video_scores.items():
+            if not scores:
+                continue
+            
+            max_score = max(scores)
+            avg_score = sum(scores) / len(scores)
+            frame_count = len(scores)
+            
+            # Find the best matching frame for this video
+            best_frame = None
+            if video_id in video_best_frames:
+                # Sort frames by similarity score and get the best one
+                sorted_frames = sorted(video_best_frames[video_id], 
+                                     key=lambda x: x["similarity_score"], reverse=True)
+                best_frame = sorted_frames[0]
+            
+            # Weighted score
+            weighted_score = (max_score * 0.6) + (avg_score * 0.3) + (min(frame_count / 10, 1.0) * 0.1)
+            
+            result_data = {
+                "video_id": video_id,
+                "max_similarity": max_score,
+                "avg_similarity": avg_score,
+                "weighted_score": weighted_score,
+                "matching_frames": frame_count
+            }
+            
+            # Add best frame timestamp if available
+            if best_frame:
+                result_data["best_frame_timestamp"] = best_frame["timestamp"]
+                result_data["best_frame_number"] = best_frame["frame_number"]
+            
+            video_results.append(result_data)
+        
+        # Sort by weighted score
+        video_results.sort(key=lambda x: x["weighted_score"], reverse=True)
+        video_results = video_results[:max_results]
+        
+        # Get video metadata
+        from data_access import get_media_files_from_db
+        
+        all_videos_result = get_media_files_from_db(
+            media_type_filter="video",
+            page=1,
+            per_page=1000
+        )
+        
+        video_lookup = {video['id_db']: video for video in all_videos_result['media_files']}
+        
+        # Enrich results with video metadata
+        enriched_results = []
+        for result in video_results:
+            video_id = result["video_id"]
+            video_metadata = video_lookup.get(video_id)
+            
+            if video_metadata:
+                enriched_result = {
+                    **video_metadata,
+                    "semantic_search_score": result["weighted_score"],
+                    "max_similarity": result["max_similarity"],
+                    "avg_similarity": result["avg_similarity"],
+                    "matching_frames": result["matching_frames"],
+                    "search_type": "frame_based_semantic"
+                }
+                
+                # Add best frame timestamp if available
+                if "best_frame_timestamp" in result:
+                    enriched_result["best_frame_timestamp"] = result["best_frame_timestamp"]
+                if "best_frame_number" in result:
+                    enriched_result["best_frame_number"] = result["best_frame_number"]
+                
+                enriched_results.append(enriched_result)
+        
+        return {
+            "search_results": enriched_results,
+            "total_results": len(enriched_results),
+            "frames_above_threshold": frames_above_threshold,
+            "similarity_threshold": similarity_threshold,
+            "search_type": "frame_based_semantic"
+        }
+        
+    except Exception as e:
+        logger.error(f"Error in frame-based semantic search: {e}")
+        raise HTTPException(status_code=500, detail=str(e)) 
